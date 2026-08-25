@@ -293,7 +293,7 @@ map_html = """
         <a class="region-tab __AFRICA_ACTIVE__" href="?region=africa&flat=__FLAT_PARAM__" target="_self">AFRICA</a>
     </div>
 
-    <!-- Bar Kontrol Tombol (+, -, Mode) di Bawah Menu Wilayah -->
+    <!-- Bar Kontrol Tombol (+, -, Mode Switcher) -->
     <div class="crucix-control-bar">
         <button class="crucix-btn" onclick="zoomIn()">+</button>
         <button class="crucix-btn" onclick="zoomOut()">-</button>
@@ -458,7 +458,7 @@ map_html = (
     .replace("__POV_ALT__", str(pov_alt))
     .replace("__IS_FLAT_BOOL__", "true" if st.session_state.flat_mode else "false")
     .replace("__MODE_LABEL__", "FLAT MODE" if st.session_state.flat_mode else "GLOBE MODE")
-    .replace("__FLAT_PARAM__", "true" if st.session_state.flat_mode else "false")
+    .replace("__FLAT_PARAM__", "false" if st.session_state.flat_mode else "true")
     .replace("__CURRENT_REGION__", current_region)
     .replace("__WORLD_ACTIVE__", "active" if current_region == 'world' else "")
     .replace("__AMERICAS_ACTIVE__", "active" if current_region == 'americas' else "")

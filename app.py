@@ -24,7 +24,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Auto-Refresh setiap 1 Jam
+# Auto-Refresh setiap 1 Jam (3600 detik)
 st_autorefresh(interval=3600 * 1000, key="osint_refresher")
 
 # Translator
@@ -37,7 +37,6 @@ translator = get_translator()
 # Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_forex_rates():
-    # Mengambil kurs referensi global terhadap USD, lalu dikonversi ke IDR
     default_rates = {
         "USD": 16250.0, "SGD": 12100.5, "EUR": 17620.0, "GBP": 20615.3,
         "JPY": 104.5, "AUD": 10750.25, "MYR": 3650.0, "CNY": 2280.1
@@ -50,7 +49,6 @@ def fetch_forex_rates():
             rates = data.get("rates", {})
             idr_per_usd = rates.get("IDR", 16250.0)
             
-            # Hitung kurs valuta lain terhadap IDR
             live_rates = {}
             currencies = ["USD", "SGD", "EUR", "GBP", "JPY", "AUD", "MYR", "CNY"]
             for cur in currencies:
@@ -256,7 +254,7 @@ left_col, right_col = st.columns([1.3, 1])
 with left_col:
     cards_html = ""
     for item in news_items:
-        cards_html += f'<div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: \'Courier New\', Courier, monospace;">{item["source"]}</span><span style="font-size: 10px; color: #777; font-family: \'Courier New\', Courier, monospace;">{item["date"]}</span></div><a href="{item["url"]}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: \'Courier New\', Courier, monospace; display: block; line-height: 1.4;">{item["title"]}</a><div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">↗</div></div>'
+        cards_html += f'<div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: \'Courier New\', Courier, monospace;">{item["source"]}</span><span style="font-size: 10px; color: #777; font-family: \'Courier New\', Courier, monospace;">{item["date"]}</span></div><a href="{item["url"]}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: \'Courier New\', Courier, monospace; display: block; line-height: 1.4;">{item["title"]}</a><div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">&nearr;</div></div>'
 
     ticker_widget_html = f"""
 <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
@@ -284,7 +282,6 @@ with left_col:
     st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
 with right_col:
-    # Membangun kartu kurs dengan detail Beli (Buy) dan Jual (Sell)
     forex_cards_html = ""
     currencies_meta = [
         ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
@@ -295,8 +292,8 @@ with right_col:
     
     for code, name in currencies_meta:
         mid_rate = forex_rates.get(code, 10000.0)
-        buy_rate = mid_rate * 0.995  # Estimasi Kurs Beli (sedikit di bawah mid)
-        sell_rate = mid_rate * 1.005 # Estimasi Kurs Jual (sedikit di atas mid)
+        buy_rate = mid_rate * 0.995
+        sell_rate = mid_rate * 1.005
         
         forex_cards_html += f"""
         <div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;">
@@ -331,44 +328,3 @@ with footer_col1:
     st.markdown("<span style='color: gray; font-size: 0.82em;'>⚙️ Sistem OSINT otomatis memperbarui berita & kurs tiap 1 jam.</span>", unsafe_allow_html=True)
 with footer_col2:
     st.markdown("<div style='text-align: right; color: gray; font-size: 0.85em;'><b>Developed by iqbalmantam</b></div>", unsafe_allow_html=True)
-```Tentu, penambahan informasi detail **Kurs Beli** dan **Kurs Jual** serta fitur **auto-update setiap 1 jam** sangat bisa diimplementasikan pada tampilan nilai tukar tersebut! 
-
-Berikut adalah rancangan ulang tampilannya agar mencakup harga beli dan jual, diikuti dengan penjelasan singkat bagaimana cara membuat sistem *auto-update* per 1 jam.
-
----
-
-### ## Rancangan Tampilan (Dengan Kurs Beli & Jual)
-
-Biasanya dalam perbankan atau *money changer*, terdapat selisih (*spread*) antara harga beli dan jual. Berikut contoh simulasinya berdasarkan data dari gambar Anda:
-
-| Mata Uang | Kurs Beli (Bank Beli dari Anda) | Kurs Jual (Bank Jual ke Anda) | Perubahan |
-| :--- | :--- | :--- | :--- |
-| **USD / IDR** | Rp 16.200,00 | Rp 16.300,00 | ▲ +0,15% |
-| **SGD / IDR** | Rp 12.050,50 | Rp 12.150,50 | ▲ +0,08% |
-| **EUR / IDR** | Rp 17.570,00 | Rp 17.670,00 | ▼ -0,05% |
-| **GBP / IDR** | Rp 20.565,30 | Rp 20.665,30 | ▲ +0,21% |
-| **JPY / IDR** | Rp 104,00 | Rp 105,00 | ▼ -0,18% |
-| **AUD / IDR** | Rp 10.700,25 | Rp 10.800,25 | ▲ +0,12% |
-| **MYR / IDR** | Rp 3.625,00 | Rp 3.675,00 | ▲ +0,05% |
-| **CNY / IDR** | Rp 2.255,10 | Rp 2.305,10 | ▼ -0,03% |
-
----
-
-### ## Cara Membuat Otomatis Update per 1 Jam
-
-Untuk membuat data ini memperbarui diri secara otomatis setiap 1 jam, Anda bisa menggunakan beberapa pendekatan teknis berikut:
-
-*   **Menggunakan JavaScript (Frontend):** 
-    Jika dashboard ini berbasis web, Anda bisa memanfaatkan fungsi `setInterval` untuk memanggil ulang (*fetch*) data dari API setiap 3.600.000 milidetik (1 jam).
-    ```javascript
-    // Contoh fungsi auto-update setiap 1 jam
-    setInterval(() => {
-        fetchDataKurs(); // Fungsi untuk mengambil data terbaru dari API
-    }, 3600000);
-    ```
-*   **Menggunakan Cron Job (Backend/Server):** 
-    Jika Anda ingin menghemat kuota pemanggilan API pihak ketiga, Anda bisa membuat *cron job* di server yang melakukan *request* data kurs baru setiap 1 jam sekali, menyimpannya ke database *cache*, lalu *frontend* Anda tinggal mengambil data dari *cache* tersebut.
-*   **Sumber API Kurs Mata Uang:** 
-    Anda bisa menghubungkan sistem ini dengan API finansial gratis atau berbayar seperti *Open Exchange Rates*, *Fixer.io*, *ExchangeRate-API*, atau menggunakan data resmi dari API Bank Indonesia (BI).
-
-Apakah Anda ingin dibuatkan contoh kode program (HTML/CSS/JS atau React) untuk menerapkan layout tabel dan fitur auto-update ini?

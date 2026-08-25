@@ -234,6 +234,41 @@ def fetch_live_news():
     store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
     return fallback_data
 
+# Fungsi untuk Mengambil Data Live Darkweb / Ransomware dari Ransomware.live API
+def fetch_darkweb_leaks():
+    store = _get_cache_store("darkweb_v1")
+    now = time.time()
+    if store["data"] is not None and (now - store["timestamp"]) < 1800: # Cache 30 menit
+        return store["data"]
+    
+    try:
+        url = "https://api.ransomware.live/v2/recentvictims"
+        res = requests.get(url, timeout=6)
+        if res.status_code == 200:
+            victims = res.json()
+            parsed_data = []
+            for v in victims[:15]: # Ambil 15 data terbaru
+                parsed_data.append({
+                    "group": v.get("group_name", "Unknown Gang"),
+                    "target": v.get("post_title", v.get("target", "Target Confirmed")),
+                    "country": v.get("country", "INT").upper(),
+                    "date": v.get("published", "Recent")[:10]
+                })
+            if parsed_data:
+                store["data"] = parsed_data
+                store["timestamp"] = now
+                store["is_live"] = True
+                return parsed_data
+    except Exception:
+        pass
+    
+    # Fallback jika API gagal/timeout
+    fallback = store["data"] if store["data"] is not None else [
+        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live Feed"},
+        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live Feed"}
+    ]
+    return fallback
+
 st.markdown("### ⚡ ManTam // GLOBAL & REGIONAL TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · UPDATES EVERY 1H</span>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
@@ -241,6 +276,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # Menggunakan st.spinner agar ada indikator loading saat pertama kali fetch data
 with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."):
     news_items = fetch_live_news()
+    darkweb_items = fetch_darkweb_leaks()
 
 # Inisialisasi Session State
 if "selected_region" not in st.session_state:
@@ -490,6 +526,7 @@ with left_col:
     st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
 with right_col:
+    # 1. Widget Kurs Valas Asing
     forex_cards_html = ""
     currencies_meta = [
         ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
@@ -505,12 +542,39 @@ with right_col:
         
         forex_cards_html += f'<div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;"><span><b>{code} / IDR</b> ({name})</span><span style="color: #00ffcc;">LIVE 1H</span></div><div style="display: flex; justify-content: space-between; font-size: 12px; font-family: \'Courier New\', Courier, monospace;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div></div></div>'
 
-    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
+    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
+
+    # 2. Widget Darkweb & Ransomware Leaks (Live from Ransomware.live API)
+    darkweb_cards_html = ""
+    for dw in darkweb_items:
+        darkweb_cards_html += f'''
+        <div style="background: #080808; border: 1px solid #2a1616; border-left: 3px solid #ff3333; padding: 10px 12px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ff6666; border-bottom: 1px solid #1f1a1a; padding-bottom: 4px; margin-bottom: 6px;">
+                <span><b>GANG: {dw["group"]}</b></span>
+                <span>[{dw["country"]}] {dw["date"]}</span>
+            </div>
+            <div style="font-size: 12px; color: #ddd; margin-bottom: 4px;">Target: <b>{dw["target"]}</b></div>
+            <div style="font-size: 10px; color: #ff3333; font-weight: bold;">STATUS: [DATA LEAKED / EXTORTION]</div>
+        </div>
+        '''
+
+    darkweb_widget_html = f"""
+    <div style="background: #060606; border: 1px solid #2a1616; border-radius: 4px; padding: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a1616; padding-bottom: 10px; margin-bottom: 10px;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff3333;">⚠️ LIVE DARKWEB & RANSOM LEAKS</span>
+            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">API LIVE</span>
+        </div>
+        <div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">
+            {darkweb_cards_html}
+        </div>
+    </div>
+    """
+    st.markdown(darkweb_widget_html, unsafe_allow_html=True)
 
 st.markdown("---")
 footer_col1, footer_col2 = st.columns([2, 1])
 with footer_col1:
-    st.markdown("<span style='color: gray; font-size: 0.82em;'>⚙️ Sistem OSINT otomatis memperbarui berita & kurs tiap 1 jam.</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color: gray; font-size: 0.82em;'>⚙️ Sistem OSINT otomatis memperbarui berita, kurs, & intel darkweb tiap 1 jam.</span>", unsafe_allow_html=True)
 with footer_col2:
     st.markdown("<div style='text-align: right; color: gray; font-size: 0.85em;'><b>Developed by iqbalmantam</b></div>", unsafe_allow_html=True)

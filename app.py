@@ -258,17 +258,19 @@ map_html = """
 <head>
     <style>
         body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        #map-container { width: 100%; height: 520px; position: relative; }
+        #map-container { width: 100%; height: 560px; position: relative; }
         
-        .crucix-top-left { position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 6px; }
-        .ctrl-row { display: flex; gap: 4px; align-items: center; }
-        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; text-decoration: none; }
-        .crucix-btn:hover, .crucix-btn.active { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }
-        .mode-btn { width: auto; padding: 0 12px; font-size: 11px; letter-spacing: 1px; }
+        /* Menu Wilayah di Atas Peta */
+        .crucix-top-menu { position: absolute; top: 12px; left: 15px; right: 15px; z-index: 99; display: flex; gap: 4px; background: #080808; border: 1px solid #1a2b27; padding: 4px; }
+        .region-tab { background: #050505; border: 1px solid #00ffcc33; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 8px 16px; cursor: pointer; text-align: center; text-decoration: none; flex: 1; font-weight: bold; letter-spacing: 1px; }
+        .region-tab:hover, .region-tab.active { border-color: #00ffcc; background: #00ffcc22; color: #fff; }
 
-        .crucix-bottom-left { position: absolute; bottom: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; background: rgba(5,5,5,0.85); border: 1px solid #00ffcc33; padding: 8px; backdrop-filter: blur(4px); }
-        .region-btn { background: #050505; border: 1px solid #00ffcc44; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 6px 10px; cursor: pointer; text-align: left; text-decoration: none; display: block; }
-        .region-btn:hover, .region-btn.active { border-color: #00ffcc; background: #00ffcc33; color: #fff; }
+        /* Tombol Zoom & Mode di Kiri Bawah Menu Atas */
+        .crucix-top-left-controls { position: absolute; top: 68px; left: 15px; z-index: 99; display: flex; align-items: center; gap: 4px; }
+        .zoom-group { display: flex; flex-direction: column; gap: 2px; }
+        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; font-weight: bold; text-decoration: none; }
+        .crucix-btn:hover, .crucix-btn.active { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }
+        .mode-btn { width: auto; height: 32px; padding: 0 12px; font-size: 11px; letter-spacing: 1px; display: flex; align-items: center; }
 
         .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
         .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
@@ -281,22 +283,23 @@ map_html = """
 </head>
 <body>
     <div id="map-container">
-        <div class="crucix-top-left">
-            <div class="ctrl-row">
-                <button class="crucix-btn" onclick="zoomIn()">+</button>
-                <button class="crucix-btn mode-btn" onclick="toggleMode()">mode: <span id="mode-text" style="color:#fff; margin-left:4px;">__MODE_LABEL__</span></button>
-            </div>
-            <div class="ctrl-row"><button class="crucix-btn" onclick="zoomOut()">-</button></div>
+        <!-- Menu Wilayah di Atas -->
+        <div class="crucix-top-menu">
+            <a class="region-tab __WORLD_ACTIVE__" href="?region=world&flat=__FLAT_PARAM__" target="_self">WORLD</a>
+            <a class="region-tab __AMERICAS_ACTIVE__" href="?region=americas&flat=__FLAT_PARAM__" target="_self">AMERICAS</a>
+            <a class="region-tab __EUROPE_ACTIVE__" href="?region=europe&flat=__FLAT_PARAM__" target="_self">EUROPE</a>
+            <a class="region-tab __MIDDLE_EAST_ACTIVE__" href="?region=middle_east&flat=__FLAT_PARAM__" target="_self">MIDDLE EAST</a>
+            <a class="region-tab __ASIA_PACIFIC_ACTIVE__" href="?region=asia_pacific&flat=__FLAT_PARAM__" target="_self">ASIA PACIFIC</a>
+            <a class="region-tab __AFRICA_ACTIVE__" href="?region=africa&flat=__FLAT_PARAM__" target="_self">AFRICA</a>
         </div>
 
-        <div class="crucix-bottom-left">
-            <div style="font-size: 9px; color: #888; margin-bottom: 4px; letter-spacing: 1px;">REGIONAL SECTOR</div>
-            <a class="region-btn __WORLD_ACTIVE__" href="?region=world&flat=__FLAT_PARAM__" target="_self">🌐 WORLD</a>
-            <a class="region-btn __AMERICAS_ACTIVE__" href="?region=americas&flat=__FLAT_PARAM__" target="_self">🌎 AMERICAS</a>
-            <a class="region-btn __EUROPE_ACTIVE__" href="?region=europe&flat=__FLAT_PARAM__" target="_self">🌍 EUROPE</a>
-            <a class="region-btn __MIDDLE_EAST_ACTIVE__" href="?region=middle_east&flat=__FLAT_PARAM__" target="_self">🌍 MIDDLE EAST</a>
-            <a class="region-btn __ASIA_PACIFIC_ACTIVE__" href="?region=asia_pacific&flat=__FLAT_PARAM__" target="_self">🌏 ASIA PACIFIC</a>
-            <a class="region-btn __AFRICA_ACTIVE__" href="?region=africa&flat=__FLAT_PARAM__" target="_self">🌍 AFRICA</a>
+        <!-- Tombol Zoom & Mode di Kiri Bawah Menu Atas -->
+        <div class="crucix-top-left-controls">
+            <div class="zoom-group">
+                <button class="crucix-btn" onclick="zoomIn()">+</button>
+                <button class="crucix-btn" onclick="zoomOut()">-</button>
+            </div>
+            <button class="crucix-btn mode-btn" onclick="toggleMode()"><span id="mode-text" style="color:#00ffcc;">__MODE_LABEL__</span></button>
         </div>
     </div>
 
@@ -359,7 +362,7 @@ map_html = """
 
         function buildFlatMap() {
             const width = container.clientWidth || 900;
-            const height = 520;
+            const height = 560;
 
             const svg = d3.select(container).append('svg')
                 .attr('width', width).attr('height', height)
@@ -455,7 +458,7 @@ map_html = (
     .replace("__POV_LNG__", str(pov_lng))
     .replace("__POV_ALT__", str(pov_alt))
     .replace("__IS_FLAT_BOOL__", "true" if st.session_state.flat_mode else "false")
-    .replace("__MODE_LABEL__", "FLAT" if st.session_state.flat_mode else "GLOBE")
+    .replace("__MODE_LABEL__", "FLAT MODE" if st.session_state.flat_mode else "GLOBE MODE")
     .replace("__FLAT_PARAM__", "true" if st.session_state.flat_mode else "false")
     .replace("__CURRENT_REGION__", current_region)
     .replace("__WORLD_ACTIVE__", "active" if current_region == 'world' else "")
@@ -466,7 +469,7 @@ map_html = (
     .replace("__AFRICA_ACTIVE__", "active" if current_region == 'africa' else "")
 )
 
-components.html(map_html, height=540)
+components.html(map_html, height=580)
 
 st.markdown("---")
 

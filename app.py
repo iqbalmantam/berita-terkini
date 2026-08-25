@@ -235,17 +235,17 @@ def fetch_live_news():
     store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
     return fallback_data
 
-# Fungsi Robust untuk Mengambil Data Darkweb / Ransomware Leaks
+# Fungsi Robust untuk Mengambil Data Darkweb / Ransomware Leaks Beserta Link Aslinya
 def fetch_darkweb_leaks():
-    store = _get_cache_store("darkweb_v2")
+    store = _get_cache_store("darkweb_v3")
     now = time.time()
     if store["data"] is not None and (now - store["timestamp"]) < 1800:
         return store["data"]
     
     default_fallback = [
-        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live"},
-        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live"},
-        {"group": "RansomHub", "target": "Corporate Network System", "country": "INT", "date": "Live"}
+        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live", "url": "#"},
+        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live", "url": "#"},
+        {"group": "RansomHub", "target": "Corporate Network System", "country": "INT", "date": "Live", "url": "#"}
     ]
 
     try:
@@ -257,17 +257,19 @@ def fetch_darkweb_leaks():
                 parsed_data = []
                 for v in victims[:15]:
                     if isinstance(v, dict):
-                        # Menangani berbagai kemungkinan penamaan key pada JSON API
-                        group_name = v.get("group_name") or v.get("gang") or v.get("ransomware") or "Unknown Gang"
-                        target_name = v.get("post_title") or v.get("target") or v.get("title") or v.get("name") or "Target Confirmed"
+                        # Ekstraksi field dengan mendeteksi berbagai variasi key dari API
+                        group_name = v.get("group_name") or v.get("gang") or v.get("ransomware") or v.get("group") or "Unknown Gang"
+                        target_name = v.get("post_title") or v.get("target") or v.get("title") or v.get("name") or v.get("victim") or "Target Confirmed"
                         country_code = v.get("country") or v.get("geolocation") or "INT"
-                        pub_date = v.get("published") or v.get("date") or "Recent"
+                        pub_date = v.get("published") or v.get("date") or v.get("discovered") or "Recent"
+                        post_url = v.get("post_url") or v.get("url") or v.get("website") or "https://www.ransomware.live"
                         
                         parsed_data.append({
                             "group": str(group_name),
                             "target": str(target_name),
                             "country": str(country_code).upper()[:3],
-                            "date": str(pub_date)[:10]
+                            "date": str(pub_date)[:10],
+                            "url": str(post_url)
                         })
                 if parsed_data:
                     store["data"] = parsed_data
@@ -553,17 +555,16 @@ with right_col:
     forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
-    # 2. Widget Darkweb & Ransomware Leaks (Dirender aman lewat list container agar tidak lolos HTML mentah)
+    # 2. Widget Darkweb & Ransomware Leaks (Sekarang bisa diklik & dibuka beritanya)
     st.markdown("""
     <div style="background: #060606; border: 1px solid #2a1616; border-radius: 4px; padding: 15px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a1616; padding-bottom: 10px; margin-bottom: 10px;">
             <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff3333;">⚠️ LIVE DARKWEB & RANSOM LEAKS</span>
-            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">API LIVE</span>
+            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">API LIVE & CLICKABLE</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Render item per item secara native/aman di dalam container scroll
     dw_container = st.container(height=240)
     with dw_container:
         for dw in darkweb_items:
@@ -573,7 +574,9 @@ with right_col:
                     <span><b>GANG: {dw.get("group", "Unknown")}</b></span>
                     <span>[{dw.get("country", "INT")}] {dw.get("date", "Recent")}</span>
                 </div>
-                <div style="font-size: 12px; color: #ddd; margin-bottom: 4px;">Target: <b>{dw.get("target", "Target Confirmed")}</b></div>
+                <div style="font-size: 12px; margin-bottom: 4px;">
+                    Target: <a href="{dw.get("url", "#")}" target="_blank" style="color: #00ffcc; text-decoration: none; font-weight: bold;"><b>{dw.get("target", "Target Confirmed")} &nearr;</b></a>
+                </div>
                 <div style="font-size: 10px; color: #ff3333; font-weight: bold;">STATUS: [DATA LEAKED / EXTORTION]</div>
             </div>
             """

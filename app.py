@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 import json
 import streamlit.components.v1 as components
 
-# TTL cache: 1 jam kalau fetch SUKSES, 15 menit kalau GAGAL
+# Konfigurasi TTL Cache (1 jam untuk data sukses, 15 menit untuk retry jika gagal)
 LIVE_TTL = 3600
 RETRY_TTL = 900
 
@@ -14,14 +14,14 @@ RETRY_TTL = 900
 def _get_cache_store(name: str):
     return {"data": None, "timestamp": 0.0, "is_live": False, "source": "", "last_error": None}
 
-# Konfigurasi Halaman (Full Width)
+# Konfigurasi Halaman (Full Width Layout)
 st.set_page_config(
     page_title="ManTam // Global & Regional Terminal",
     page_icon="🛡️",
     layout="wide"
 )
 
-# Sembunyikan Header Streamlit & Atur Tema Terminal
+# Custom Styling Terminal Gelap Elegan
 st.markdown("""
 <style>
     header {visibility: hidden !important; display: none !important;}
@@ -30,7 +30,6 @@ st.markdown("""
     footer {visibility: hidden !important;}
     .stApp { background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; }
     
-    /* Styling tombol kustom agar gelap, elegan, dan tidak silau */
     div.stButton > button {
         background-color: #0c1412 !important;
         color: #00ffcc !important;
@@ -55,10 +54,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Auto-Refresh setiap 1 Jam
+# Auto-Refresh otomatis setiap 1 Jam
 st_autorefresh(interval=3600 * 1000, key="osint_refresher")
 
-# Translator
+# Inisialisasi Translator
 @st.cache_resource
 def get_translator():
     return GoogleTranslator(source='auto', target='id')
@@ -136,9 +135,7 @@ def fetch_live_news():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     regions_pool = ["world", "americas", "europe", "middle_east", "asia_pacific", "africa"]
-    error_logs = []
 
-    # GDELT API
     articles_list = []
     url_gdelt = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
     try:
@@ -158,16 +155,14 @@ def fetch_live_news():
                     "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
                     "region": assigned_region, "type": "news"
                 })
-        else:
-            error_logs.append(f"GDELT HTTP {res_gdelt.status_code}")
-    except Exception as e:
-        error_logs.append(f"GDELT Error: {type(e).__name__}")
+    except Exception:
+        pass
 
     if len(articles_list) >= 5:
         store.update({"data": articles_list, "timestamp": now, "is_live": True, "source": "GDELT", "last_error": None})
         return articles_list
 
-    # BBC WORLD NEWS (BACKUP 1)
+    # Backup RSS BBC News
     bbc_list = []
     url_bbc = "https://api.rss2json.com/v1/api.json?rss_url=http://feeds.bbci.co.uk/news/world/rss.xml"
     try:
@@ -187,43 +182,12 @@ def fetch_live_news():
                     "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
                     "region": assigned_region, "type": "news"
                 })
-        else:
-            error_logs.append(f"BBC HTTP {res_bbc.status_code}")
-    except Exception as e:
-        error_logs.append(f"BBC Error: {type(e).__name__}")
+    except Exception:
+        pass
 
     if len(bbc_list) >= 5:
-        store.update({"data": bbc_list, "timestamp": now, "is_live": True, "source": "BBC", "last_error": " | ".join(error_logs)})
+        store.update({"data": bbc_list, "timestamp": now, "is_live": True, "source": "BBC", "last_error": None})
         return bbc_list
-
-    # AL JAZEERA (BACKUP 2)
-    alj_list = []
-    url_alj = "https://api.rss2json.com/v1/api.json?rss_url=https://www.aljazeera.com/xml/rss/all.xml"
-    try:
-        res_alj = requests.get(url_alj, headers=headers, timeout=10)
-        if res_alj.status_code == 200:
-            a_data = res_alj.json()
-            for idx, item in enumerate(a_data.get("items", [])[:15]):
-                title_en = item.get("title", "")
-                if not title_en: continue
-                try: title_id = translate_title(title_en)
-                except: title_id = title_en
-                time.sleep(0.1)
-                assigned_region = regions_pool[idx % len(regions_pool)]
-                alj_list.append({
-                    "title": title_id, "url": item.get("link", "#"),
-                    "source": "AL JAZEERA", "date": "LIVE BACKUP",
-                    "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
-                    "region": assigned_region, "type": "news"
-                })
-        else:
-            error_logs.append(f"ALJ HTTP {res_alj.status_code}")
-    except Exception as e:
-        error_logs.append(f"ALJ Error: {type(e).__name__}")
-
-    if len(alj_list) >= 5:
-        store.update({"data": alj_list, "timestamp": now, "is_live": True, "source": "AL JAZEERA", "last_error": " | ".join(error_logs)})
-        return alj_list
 
     error_item = [{
         "title": "KONEKSI TERPUTUS ATAU SELURUH API DIBLOKIR SEMENTARA.", 
@@ -232,7 +196,7 @@ def fetch_live_news():
     }]
     
     fallback_data = store["data"] if store["data"] is not None else error_item
-    store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
+    store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "API Gagal"})
     return fallback_data
 
 def fetch_darkweb_leaks():
@@ -243,8 +207,7 @@ def fetch_darkweb_leaks():
     
     default_fallback = [
         {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live", "url": "#"},
-        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live", "url": "#"},
-        {"group": "RansomHub", "target": "Corporate Network System", "country": "INT", "date": "Live", "url": "#"}
+        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live", "url": "#"}
     ]
 
     try:
@@ -286,6 +249,39 @@ st.markdown("<br>", unsafe_allow_html=True)
 with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."):
     news_items = fetch_live_news()
     darkweb_items = fetch_darkweb_leaks()
+
+# --- MODUL 1: CUSTOM WATCHLIST & KEYWORD ALERT ---
+st.markdown("""
+<div style="background: #060606; border: 1px solid #1a3630; border-radius: 4px; padding: 12px 15px; margin-bottom: 15px;">
+    <span style="font-family: 'Courier New', Courier, monospace; font-size: 12px; font-weight: bold; color: #00ffcc;">🔍 MODUL 1: TARGET WATCHLIST & KEYWORD ALERTS</span>
+</div>
+""", unsafe_allow_html=True)
+
+col_w1, col_w2 = st.columns([4, 1])
+with col_w1:
+    watchlist_input = st.text_input("Masukkan kata kunci pantauan (pisahkan dengan koma, misal: bank, microsoft, data, usa)", value=st.session_state.get("watchlist_query", ""))
+    st.session_state["watchlist_query"] = watchlist_input
+
+keywords = [k.strip().lower() for k in watchlist_input.split(",") if k.strip()]
+matched_alerts = []
+if keywords:
+    for item in news_items:
+        for kw in keywords:
+            if kw in item["title"].lower():
+                matched_alerts.append(f"NEWS MATCH [{kw.upper()}]: {item['title']} ({item['source']})")
+    for dw in darkweb_items:
+        for kw in keywords:
+            if kw in dw["target"].lower() or kw in dw["group"].lower():
+                matched_alerts.append(f"DARKWEB MATCH [{kw.upper()}]: Gang '{dw['group']}' menyerang '{dw['target']}'")
+
+if matched_alerts:
+    alerts_html = "".join([f"<div style='font-size: 11px; color: #ff3333; margin-bottom: 4px;'>⚠️ {alt}</div>" for alt in matched_alerts[:5]])
+    st.markdown(f"""
+    <div style="background: #1a0808; border: 1px solid #ff3333; border-left: 4px solid #ff3333; padding: 12px; border-radius: 4px; margin-bottom: 15px;">
+        <b style="color: #ff5555; font-size: 12px;">CRITICAL WATCHLIST ALERT DETECTED ({len(matched_alerts)} MATCHES):</b><br>
+        {alerts_html}
+    </div>
+    """, unsafe_allow_html=True)
 
 COUNTRY_COORDS = {
     "US": (37.0902, -95.7129), "GB": (55.3781, -3.4360), "CA": (56.1304, -106.3468),
@@ -572,6 +568,31 @@ with left_col:
     st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
 with right_col:
+    # --- MODUL 2: THREAT ANALYTICS & BREAKDOWN SUMMARY ---
+    total_leaks = len(darkweb_items)
+    unique_gangs = len(set(d.get("group", "Unknown") for d in darkweb_items))
+    
+    analytics_html = f"""
+    <div style="background: #080808; border: 1px solid #331111; border-radius: 4px; padding: 12px 15px; margin-bottom: 15px;">
+        <div style="font-size: 12px; font-weight: bold; color: #ff5555; border-bottom: 1px solid #221111; padding-bottom: 6px; margin-bottom: 8px;">
+            📊 MODUL 2: THREAT ANALYTICS BREAKDOWN
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
+            <span>Total Active Leaks (24h):</span>
+            <b style="color: #00ffcc;">{total_leaks} Targets</b>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
+            <span>Active Threat Syndicates:</span>
+            <b style="color: #ff5555;">{unique_gangs} Groups</b>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb;">
+            <span>Threat Level Status:</span>
+            <b style="color: #ffaa00;">HIGH / CRITICAL</b>
+        </div>
+    </div>
+    """
+    st.markdown(analytics_html, unsafe_allow_html=True)
+
     # 1. Widget Kurs Valas Asing
     forex_cards_html = ""
     currencies_meta = [

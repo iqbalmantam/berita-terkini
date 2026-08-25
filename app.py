@@ -52,15 +52,17 @@ def get_translator():
 translator = get_translator()
 
 def translate_title(text: str, max_retries: int = 2) -> str:
+    """Terjemahkan teks. Jika Google memblokir (Error 500), langsung kembalikan teks asli."""
     for attempt in range(max_retries):
         try:
             result = translator.translate(text)
-            if result:
+            # Filter output sampah dari Google jika API sedang melimitasi IP
+            if result and "Error 500 (Server Error)" not in result and "502 Bad Gateway" not in result:
                 return result
         except Exception:
             pass
         time.sleep(0.4 * (attempt + 1))
-    return text
+    return text  # Jika gagal diterjemahkan, biarkan bahasa Inggris.
 
 # Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
 def fetch_forex_rates():
@@ -215,7 +217,7 @@ def fetch_live_news():
     # --- JIKA KONEKSI INTERNET BENAR-BENAR TERPUTUS (TIDAK ADA DATA STATIS) ---
     # Memunculkan satu item notifikasi error agar UI terminal tidak crash
     error_item = [{
-        "title": "KONEKSI TERPUTUS. GAGAL MENGAMBIL SELURUH SUMBER BERITA ONLINE.", 
+        "title": "KONEKSI TERPUTUS ATAU SELURUH API DIBLOKIR SEMENTARA.", 
         "url": "#", "source": "SYSTEM ALERT", "date": "NOW",
         "lat": 0.0, "lon": 0.0, "region": "world"
     }]

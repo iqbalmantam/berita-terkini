@@ -16,7 +16,7 @@ def _get_cache_store(name: str):
 
 # Konfigurasi Halaman (Full Width)
 st.set_page_config(
-    page_title="CRUCIX // Global & Regional OSINT Terminal",
+    page_title="ManTam // Global & Regional Terminal",
     page_icon="🛡️",
     layout="wide"
 )
@@ -220,8 +220,8 @@ def fetch_live_news():
     store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
     return fallback_data
 
-st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
-st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
+st.markdown("### ⚡ ManTam // GLOBAL & REGIONAL TERMINAL")
+st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · UPDATES EVERY 1H</span>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
 # Menggunakan st.spinner agar ada indikator loading saat pertama kali fetch data

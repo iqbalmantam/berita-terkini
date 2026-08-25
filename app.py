@@ -21,7 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Sembunyikan Header Streamlit & Atur Tema Terminal
+# Sembunyikan Header Streamlit & Atur Tema Terminal (Tombol Dibuat Gelap agar Tidak Silau)
 st.markdown("""
 <style>
     header {visibility: hidden !important; display: none !important;}
@@ -29,6 +29,20 @@ st.markdown("""
     #MainMenu {visibility: hidden !important;}
     footer {visibility: hidden !important;}
     .stApp { background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; }
+    
+    /* Styling tombol kustom agar gelap, elegan, dan tidak silau */
+    div.stButton > button {
+        background-color: #0c1412 !important;
+        color: #00ffcc !important;
+        border: 1px solid #1a3630 !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        font-weight: bold !important;
+    }
+    div.stButton > button:hover {
+        background-color: #132622 !important;
+        border-color: #00ffcc !important;
+        color: #ffffff !important;
+    }
     
     @keyframes autoScroll {
         0% { transform: translateY(0); }

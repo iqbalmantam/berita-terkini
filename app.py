@@ -553,12 +553,12 @@ with right_col:
     forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
-    # 2. Widget Darkweb Capability & Trends Intel (Sekarang Bisa Diklik & Dibuka)
+    # 2. Widget Darkweb Capability & Trends Intel (Dengan Direct Article Link / Deep-Links)
     st.markdown("""
     <div style="background: #060606; border: 1px solid #331111; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #331111; padding-bottom: 10px; margin-bottom: 10px;">
             <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff5555;">🧬 DARKWEB CAPABILITY & TRENDS INTEL</span>
-            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">CLICKABLE</span>
+            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">DIRECT LINKS</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -570,13 +570,13 @@ with right_col:
                 "topic": "AI-ENABLED ADVERSARIES",
                 "desc": "Lonjakan tajam penggunaan AI generatif oleh sindikat kriminal untuk otomatisasi serangan siber, rekayasa sosial, dan voice phishing interaktif.",
                 "level": "CRITICAL",
-                "url": "https://thehackernews.com/"
+                "url": "https://thehackernews.com/2026/08/uat-10147-uses-ai-to-scale-server.html"
             },
             {
                 "topic": "INFOSTEALER SURGE (REDLINE & LUMMA)",
                 "desc": "Pasar gelap darkweb dibanjiri miliaran kredensial curian, token OAuth, dan session cookies langsung dari perangkat pengguna tanpa merusak sistem.",
                 "level": "HIGH",
-                "url": "https://www.bleepingcomputer.com/"
+                "url": "https://cybelangel.com/blog/infostealers-the-malware-that-breaks-in-without-breaking-anything/"
             },
             {
                 "topic": "EVOLUSI RaaS & MULTI-EXTORTION",

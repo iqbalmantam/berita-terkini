@@ -206,8 +206,8 @@ def fetch_darkweb_leaks():
         return store["data"]
     
     default_fallback = [
-        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live", "url": "#"},
-        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live", "url": "#"}
+        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live", "url": "https://www.ransomware.live"},
+        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live", "url": "https://www.ransomware.live"}
     ]
 
     try:
@@ -524,62 +524,19 @@ components.html(map_html, height=520)
 
 st.markdown("---")
 
-left_col, right_col = st.columns([1.3, 1])
+# --- TATA LETAK SEIMBANG 2 KOLOM (KIRI & KANAN) ---
+left_col, right_col = st.columns(2)
 
 with left_col:
+    # 1. Live News Ticker (Kiri Atas)
     cards_html = ""
     for item in news_items:
         cards_html += f'<div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: \'Courier New\', Courier, monospace;">{item["source"]}</span><span style="font-size: 10px; color: #777; font-family: \'Courier New\', Courier, monospace;">{item["date"]}</span></div><a href="{item["url"]}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: \'Courier New\', Courier, monospace; display: block; line-height: 1.4;">{item["title"]}</a><div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">&nearr;</div></div>'
 
-    ticker_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">{len(news_items)} ITEMS</span></div><div class="ticker-container" style="height: 520px; overflow: hidden; position: relative;"><div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">{cards_html}{cards_html}</div></div></div>"""
+    ticker_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">{len(news_items)} ITEMS</span></div><div class="ticker-container" style="height: 480px; overflow: hidden; position: relative;"><div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">{cards_html}{cards_html}</div></div></div>"""
     st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
-with right_col:
-    # --- MODUL 2: THREAT ANALYTICS & BREAKDOWN SUMMARY ---
-    total_leaks = len(darkweb_items)
-    unique_gangs = len(set(d.get("group", "Unknown") for d in darkweb_items))
-    
-    analytics_html = f"""
-    <div style="background: #080808; border: 1px solid #331111; border-radius: 4px; padding: 12px 15px; margin-bottom: 15px;">
-        <div style="font-size: 12px; font-weight: bold; color: #ff5555; border-bottom: 1px solid #221111; padding-bottom: 6px; margin-bottom: 8px;">
-            📊 MODUL 2: THREAT ANALYTICS BREAKDOWN
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
-            <span>Total Active Leaks (24h):</span>
-            <b style="color: #00ffcc;">{total_leaks} Targets</b>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
-            <span>Active Threat Syndicates:</span>
-            <b style="color: #ff5555;">{unique_gangs} Groups</b>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb;">
-            <span>Threat Level Status:</span>
-            <b style="color: #ffaa00;">HIGH / CRITICAL</b>
-        </div>
-    </div>
-    """
-    st.markdown(analytics_html, unsafe_allow_html=True)
-
-    # 1. Widget Kurs Valas Asing
-    forex_cards_html = ""
-    currencies_meta = [
-        ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
-        ("EUR", "Euro Zone"), ("GBP", "British Pound"), 
-        ("JPY", "Japanese Yen"), ("AUD", "Australian Dollar"), 
-        ("MYR", "Malaysian Ringgit"), ("CNY", "Chinese Yuan")
-    ]
-    
-    for code, name in currencies_meta:
-        mid_rate = forex_rates.get(code, 10000.0)
-        buy_rate = mid_rate * 0.995
-        sell_rate = mid_rate * 1.005
-        
-        forex_cards_html += f'<div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;"><span><b>{code} / IDR</b> ({name})</span><span style="color: #00ffcc;">LIVE 1H</span></div><div style="display: flex; justify-content: space-between; font-size: 12px; font-family: \'Courier New\', Courier, monospace;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div></div></div>'
-
-    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
-    st.markdown(forex_widget_html, unsafe_allow_html=True)
-
-    # 2. Widget Darkweb Capability & Trends Intel
+    # 2. Darkweb Capability & Trends Intel (Kiri Bawah)
     st.markdown("""
     <div style="background: #060606; border: 1px solid #331111; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
         <div style="border-bottom: 1px solid #331111; padding-bottom: 10px; margin-bottom: 10px;">
@@ -588,7 +545,7 @@ with right_col:
     </div>
     """, unsafe_allow_html=True)
 
-    trends_container = st.container(height=240)
+    trends_container = st.container(height=300)
     with trends_container:
         trends_list = [
             {
@@ -629,16 +586,66 @@ with right_col:
             """
             st.markdown(trend_html, unsafe_allow_html=True)
 
-    # 3. Widget Live Darkweb & Ransomware Leaks
+with right_col:
+    # 1. Modul 2: Threat Analytics (Kanan Atas)
+    total_leaks = len(darkweb_items)
+    unique_gangs = len(set(d.get("group", "Unknown") for d in darkweb_items))
+    
+    analytics_html = f"""
+    <div style="background: #080808; border: 1px solid #331111; border-radius: 4px; padding: 12px 15px; margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; color: #ff5555; border-bottom: 1px solid #221111; padding-bottom: 6px; margin-bottom: 8px;">
+            <span>📊 MODUL 2: THREAT ANALYTICS</span>
+            <a href="https://www.ransomware.live" target="_blank" style="color: #00ffcc; text-decoration: none; font-size: 10px;">FEED SOURCE &nearr;</a>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
+            <span>Total Active Leaks (24h):</span>
+            <b style="color: #00ffcc;">{total_leaks} Targets</b>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
+            <span>Active Threat Syndicates:</span>
+            <b style="color: #ff5555;">{unique_gangs} Groups</b>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 8px;">
+            <span>Threat Level Status:</span>
+            <b style="color: #ffaa00;">HIGH / CRITICAL</b>
+        </div>
+        <div style="border-top: 1px dashed #221111; padding-top: 6px; font-size: 10px; color: #888; display: flex; justify-content: space-between;">
+            <span>Ref: Ransomware.live API</span>
+            <a href="https://api.ransomware.live/v2/recentvictims" target="_blank" style="color: #00ffcc; text-decoration: none;">[API Endpoint &nearr;]</a>
+        </div>
+    </div>
+    """
+    st.markdown(analytics_html, unsafe_allow_html=True)
+
+    # 2. Kurs Valas Asing
+    forex_cards_html = ""
+    currencies_meta = [
+        ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
+        ("EUR", "Euro Zone"), ("GBP", "British Pound"), 
+        ("JPY", "Japanese Yen"), ("AUD", "Australian Dollar"), 
+        ("MYR", "Malaysian Ringgit"), ("CNY", "Chinese Yuan")
+    ]
+    
+    for code, name in currencies_meta:
+        mid_rate = forex_rates.get(code, 10000.0)
+        buy_rate = mid_rate * 0.995
+        sell_rate = mid_rate * 1.005
+        
+        forex_cards_html += f'<div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;"><span><b>{code} / IDR</b> ({name})</span><span style="color: #00ffcc;">LIVE 1H</span></div><div style="display: flex; justify-content: space-between; font-size: 12px; font-family: \'Courier New\', Courier, monospace;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div></div></div>'
+
+    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 180px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
+    st.markdown(forex_widget_html, unsafe_allow_html=True)
+
+    # 3. Live Darkweb & Ransomware Leaks (Kanan Bawah)
     st.markdown("""
-    <div style="background: #060606; border: 1px solid #2a1616; border-radius: 4px; padding: 15px;">
+    <div style="background: #060606; border: 1px solid #2a1616; border-radius: 4px; padding: 15px; margin-bottom: 10px;">
         <div style="border-bottom: 1px solid #2a1616; padding-bottom: 10px; margin-bottom: 10px;">
             <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff3333;">⚠️ LIVE DARKWEB & RANSOM LEAKS</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    dw_container = st.container(height=240)
+    dw_container = st.container(height=300)
     with dw_container:
         for dw in darkweb_items:
             card_html = f"""

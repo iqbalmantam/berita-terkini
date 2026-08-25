@@ -266,27 +266,28 @@ if "region" in query_params:
 if "flat" in query_params:
     st.session_state.flat_mode = (query_params["flat"] == "true")
 
-map_html = f"""
+# Menggunakan string biasa + replace() agar bebas dari SyntaxError f-string
+map_html = """
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-        body {{ margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }}
-        #map-container {{ width: 100%; height: 520px; position: relative; }}
+        body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
+        #map-container { width: 100%; height: 520px; position: relative; }
         
-        .crucix-top-left {{ position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 6px; }}
-        .ctrl-row {{ display: flex; gap: 4px; align-items: center; }}
-        .crucix-btn {{ background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; text-decoration: none; }}
-        .crucix-btn:hover, .crucix-btn.active {{ border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }}
-        .mode-btn {{ width: auto; padding: 0 12px; font-size: 11px; letter-spacing: 1px; }}
+        .crucix-top-left { position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 6px; }
+        .ctrl-row { display: flex; gap: 4px; align-items: center; }
+        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; text-decoration: none; }
+        .crucix-btn:hover, .crucix-btn.active { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }
+        .mode-btn { width: auto; padding: 0 12px; font-size: 11px; letter-spacing: 1px; }
 
-        .crucix-bottom-left {{ position: absolute; bottom: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; background: rgba(5,5,5,0.85); border: 1px solid #00ffcc33; padding: 8px; backdrop-filter: blur(4px); }}
-        .region-btn {{ background: #050505; border: 1px solid #00ffcc44; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 6px 10px; cursor: pointer; text-align: left; text-decoration: none; display: block; }}
-        .region-btn:hover, .region-btn.active {{ border-color: #00ffcc; background: #00ffcc33; color: #fff; }}
+        .crucix-bottom-left { position: absolute; bottom: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; background: rgba(5,5,5,0.85); border: 1px solid #00ffcc33; padding: 8px; backdrop-filter: blur(4px); }
+        .region-btn { background: #050505; border: 1px solid #00ffcc44; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 6px 10px; cursor: pointer; text-align: left; text-decoration: none; display: block; }
+        .region-btn:hover, .region-btn.active { border-color: #00ffcc; background: #00ffcc33; color: #fff; }
 
-        .globe-tooltip {{ background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }}
-        .globe-tooltip a {{ color: #00ffcc; text-decoration: none; font-weight: bold; }}
-        .globe-tooltip a:hover {{ text-decoration: underline; }}
+        .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
+        .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
+        .globe-tooltip a:hover { text-decoration: underline; }
     </style>
     <script src="https://unpkg.com/three"></script>
     <script src="https://unpkg.com/globe.gl"></script>
@@ -298,44 +299,44 @@ map_html = f"""
         <div class="crucix-top-left">
             <div class="ctrl-row">
                 <button class="crucix-btn" onclick="zoomIn()">+</button>
-                <button class="crucix-btn mode-btn" onclick="toggleMode()">mode: <span id="mode-text" style="color:#fff; margin-left:4px;">{"FLAT" if st.session_state.flat_mode else "GLOBE"}</span></button>
+                <button class="crucix-btn mode-btn" onclick="toggleMode()">mode: <span id="mode-text" style="color:#fff; margin-left:4px;">__MODE_LABEL__</span></button>
             </div>
             <div class="ctrl-row"><button class="crucix-btn" onclick="zoomOut()">-</button></div>
         </div>
 
         <div class="crucix-bottom-left">
             <div style="font-size: 9px; color: #888; margin-bottom: 4px; letter-spacing: 1px;">REGIONAL SECTOR</div>
-            <a class="region-btn {'active' if current_region=='world' else ''}" href="?region=world&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌐 WORLD</a>
-            <a class="region-btn {'active' if current_region=='americas' else ''}" href="?region=americas&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌎 AMERICAS</a>
-            <a class="region-btn {'active' if current_region=='europe' else ''}" href="?region=europe&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌍 EUROPE</a>
-            <a class="region-btn {'active' if current_region=='middle_east' else ''}" href="?region=middle_east&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌍 MIDDLE EAST</a>
-            <a class="region-btn {'active' if current_region=='asia_pacific' else ''}" href="?region=asia_pacific&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌏 ASIA PACIFIC</a>
-            <a class="region-btn {'active' if current_region=='africa' else ''}" href="?region=africa&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌍 AFRICA</a>
+            <a class="region-btn __WORLD_ACTIVE__" href="?region=world&flat=__FLAT_PARAM__" target="_self">🌐 WORLD</a>
+            <a class="region-btn __AMERICAS_ACTIVE__" href="?region=americas&flat=__FLAT_PARAM__" target="_self">🌎 AMERICAS</a>
+            <a class="region-btn __EUROPE_ACTIVE__" href="?region=europe&flat=__FLAT_PARAM__" target="_self">🌍 EUROPE</a>
+            <a class="region-btn __MIDDLE_EAST_ACTIVE__" href="?region=middle_east&flat=__FLAT_PARAM__" target="_self">🌍 MIDDLE EAST</a>
+            <a class="region-btn __ASIA_PACIFIC_ACTIVE__" href="?region=asia_pacific&flat=__FLAT_PARAM__" target="_self">🌏 ASIA PACIFIC</a>
+            <a class="region-btn __AFRICA_ACTIVE__" href="?region=africa&flat=__FLAT_PARAM__" target="_self">🌍 AFRICA</a>
         </div>
     </div>
 
     <script>
-        const data = {globe_json};
-        const isFlat = {"true" if st.session_state.flat_mode else "false"};
-        const povLat = {pov_lat}, povLng = {pov_lng}, povAlt = {pov_alt};
+        const data = __GLOBE_DATA_JSON__;
+        const isFlat = __IS_FLAT_BOOL__;
+        const povLat = __POV_LAT__, povLng = __POV_LNG__, povAlt = __POV_ALT__;
         const container = document.getElementById('map-container');
         
-        const arcsData = data.map((d, i) => {{
+        const arcsData = data.map((d, i) => {
             const target = data[(i + 2) % data.length];
-            return {{ startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] }};
-        }});
+            return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
+        });
         
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${{d.region.toUpperCase()}}]</b><br><a href="${{d.url}}" target="_blank">${{d.title}}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${{d.source}} | ${{d.date}}</span></div>`;
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.region.toUpperCase()}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${d.source} | ${d.date}</span></div>`;
 
-        function toggleMode() {{
+        function toggleMode() {
             const newFlat = !isFlat;
             const url = new URL(window.parent.location.href);
             url.searchParams.set('flat', newFlat);
-            url.searchParams.set('region', '{current_region}');
+            url.searchParams.set('region', '__CURRENT_REGION__');
             window.parent.location.href = url.toString();
-        }}
+        }
 
-        function buildGlobe() {{
+        function buildGlobe() {
             const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
                 (container)
@@ -365,13 +366,13 @@ map_html = f"""
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.7;
             controls.enableZoom = true;
-            world.pointOfView({{ lat: povLat, lng: povLng, altitude: povAlt }}, 1000);
+            world.pointOfView({ lat: povLat, lng: povLng, altitude: povAlt }, 1000);
             
-            window.zoomIn = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }}, 500); }};
-            window.zoomOut = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }}, 500); }};
+            window.zoomIn = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500); };
+            window.zoomOut = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); };
         }
 
-        function buildFlatMap() {{
+        function buildFlatMap() {
             const width = container.clientWidth || 900;
             const height = 520;
 
@@ -383,11 +384,11 @@ map_html = f"""
 
             const projection = d3.geoEquirectangular()
                 .rotate([-povLng, 0])
-                .fitSize([width, height], {{ type: 'Sphere' }});
+                .fitSize([width, height], { type: 'Sphere' });
             const geoPath = d3.geoPath(projection);
 
             zoomLayer.append('path')
-                .datum({{ type: 'Sphere' }})
+                .datum({ type: 'Sphere' })
                 .attr('d', geoPath)
                 .attr('fill', '#060c0b').attr('stroke', '#1a3630').attr('stroke-width', 1);
 
@@ -400,19 +401,19 @@ map_html = f"""
             const contentLayer = zoomLayer.append('g');
 
             d3.json('https://unpkg.com/world-atlas@2/countries-110m.json')
-                .then(topo => {{
+                .then(topo => {
                     const countries = topojson.feature(topo, topo.objects.countries);
                     countryLayer.selectAll('path').data(countries.features).join('path')
                         .attr('d', geoPath)
                         .attr('fill', '#0a1a16').attr('stroke', '#00ffcc44').attr('stroke-width', 0.6);
-                }})
-                .catch(() => {{}})
+                })
+                .catch(() => {})
                 .finally(() => drawPointsAndArcs());
 
-            function drawPointsAndArcs() {{
+            function drawPointsAndArcs() {
                 const arcsG = contentLayer.append('g');
                 
-                arcsData.forEach(a => {{
+                arcsData.forEach(a => {
                     const p1 = projection([a.startLng, a.startLat]);
                     const p2 = projection([a.endLng, a.endLat]);
                     if (!p1 || !p2) return;
@@ -421,13 +422,13 @@ map_html = f"""
                     const my = (p1[1] + p2[1]) / 2 - 50; 
                     
                     arcsG.append('path')
-                        .attr('d', `M${{p1[0]}},${{p1[1]}} Q${{mx}},${{my}} ${{p2[0]}},${{p2[1]}}`)
+                        .attr('d', `M${p1[0]},${p1[1]} Q${mx},${my} ${p2[0]},${p2[1]}`)
                         .attr('fill', 'none')
                         .attr('stroke', '#00ffcc')
                         .attr('stroke-opacity', 0.35)
                         .attr('stroke-width', 1.2)
                         .attr('stroke-dasharray', '4,3');
-                }});
+                });
 
                 const tooltip = d3.select(container).append('div')
                     .style('position', 'absolute').style('pointer-events', 'none')
@@ -439,29 +440,47 @@ map_html = f"""
                     .attr('r', 5).attr('fill', '#00ffcc')
                     .attr('stroke', '#00ffcc').attr('stroke-width', 7).attr('stroke-opacity', 0.2)
                     .style('cursor', 'pointer')
-                    .on('mouseenter', function (event, d) {{
+                    .on('mouseenter', function (event, d) {
                         tooltip.style('opacity', 1).html(tooltipHtml(d));
-                    }})
-                    .on('mousemove', function (event) {{
+                    })
+                    .on('mousemove', function (event) {
                         const [mx, my] = d3.pointer(event, container);
                         tooltip.style('left', (mx + 12) + 'px').style('top', (my + 12) + 'px');
-                    }})
-                    .on('mouseleave', function () {{ tooltip.style('opacity', 0); }});
-            }}
+                    })
+                    .on('mouseleave', function () { tooltip.style('opacity', 0); });
+            }
 
-            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {{
+            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {
                 zoomLayer.attr('transform', event.transform);
-            }});
+            });
             svg.call(zoom);
             window.zoomIn = () => svg.transition().duration(300).call(zoom.scaleBy, 1.5);
             window.zoomOut = () => svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
         }
 
-        if (isFlat) {{ buildFlatMap(); }} else {{ buildGlobe(); }}
+        if (isFlat) { buildFlatMap(); } else { buildGlobe(); }
     </script>
 </body>
 </html>
 """
+
+# Mengganti placeholder dengan data aktual secara aman
+map_html = (
+    map_html.replace("__GLOBE_DATA_JSON__", globe_json)
+    .replace("__POV_LAT__", str(pov_lat))
+    .replace("__POV_LNG__", str(pov_lng))
+    .replace("__POV_ALT__", str(pov_alt))
+    .replace("__IS_FLAT_BOOL__", "true" if st.session_state.flat_mode else "false")
+    .replace("__MODE_LABEL__", "FLAT" if st.session_state.flat_mode else "GLOBE")
+    .replace("__FLAT_PARAM__", "true" if st.session_state.flat_mode else "false")
+    .replace("__CURRENT_REGION__", current_region)
+    .replace("__WORLD_ACTIVE__", "active" if current_region == 'world' else "")
+    .replace("__AMERICAS_ACTIVE__", "active" if current_region == 'americas' else "")
+    .replace("__EUROPE_ACTIVE__", "active" if current_region == 'europe' else "")
+    .replace("__MIDDLE_EAST_ACTIVE__", "active" if current_region == 'middle_east' else "")
+    .replace("__ASIA_PACIFIC_ACTIVE__", "active" if current_region == 'asia_pacific' else "")
+    .replace("__AFRICA_ACTIVE__", "active" if current_region == 'africa' else "")
+)
 
 components.html(map_html, height=540)
 

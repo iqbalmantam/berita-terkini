@@ -34,7 +34,7 @@ def get_translator():
 
 translator = get_translator()
 
-# Fallback Data OSINT yang Diperkaya
+# Fallback Data OSINT
 DEFAULT_OSINT_DATA = [
     {"title": "Canada walked away from Trump. Could the EU ever do the same?", "url": "https://www.euronews.com", "source": "EURONEWS", "date": "2h ago", "lat": 50.8503, "lon": 4.3517, "region": "europe"},
     {"title": "Indonesians brave choking smoke to pray for rain as country battles wildfires", "url": "https://www.npr.org", "source": "NPR", "date": "2h ago", "lat": -0.7893, "lon": 113.9213, "region": "asia_pacific"},
@@ -87,7 +87,7 @@ st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL EN
 
 news_items = fetch_live_news()
 
-# Inisialisasi Session State Wilayah & Flat Mode
+# Inisialisasi Session State
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "world"
 if "flat_mode" not in st.session_state:
@@ -124,24 +124,16 @@ with col7:
 
 current_region = st.session_state.selected_region
 
-# Filter berita jika bukan WORLD
-if current_region == "world":
-    filtered_news = news_items
-    pov_lat, pov_lng, pov_alt = 0, 0, 2.5
-else:
-    filtered_news = [item for item in news_items if item["region"] == current_region]
-    if not filtered_news:
-        filtered_news = news_items
-    viewpoints = {
-        "americas": (20, -90, 1.6),
-        "europe": (50, 10, 1.4),
-        "middle_east": (25, 45, 1.4),
-        "asia_pacific": (10, 115, 1.6),
-        "africa": (0, 20, 1.6)
-    }
-    pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
-
-globe_json = json.dumps(filtered_news)
+viewpoints = {
+    "world": (0, 0, 2.5),
+    "americas": (20, -90, 1.6),
+    "europe": (50, 10, 1.4),
+    "middle_east": (25, 45, 1.4),
+    "asia_pacific": (10, 115, 1.6),
+    "africa": (0, 20, 1.6)
+}
+pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
+globe_json = json.dumps(news_items)
 
 map_html = """
 <!DOCTYPE html>
@@ -150,54 +142,11 @@ map_html = """
     <style>
         body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
         #map-container { width: 100%; height: 500px; position: relative; }
-        
-        .crucix-controls {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 99;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .ctrl-row {
-            display: flex;
-            gap: 4px;
-            align-items: center;
-        }
-        .crucix-btn {
-            background: #050505;
-            border: 1px solid #00ffcc55;
-            color: #00ffcc;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 14px;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 38px;
-            height: 38px;
-            font-weight: bold;
-        }
-        .crucix-btn:hover {
-            border-color: #00ffcc;
-            background: #00ffcc22;
-            box-shadow: 0 0 8px #00ffccaa;
-        }
-
-        .globe-tooltip {
-            background: rgba(10, 10, 10, 0.95);
-            border: 1px solid #00ffcc;
-            color: #fff;
-            padding: 10px 14px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 11px;
-            max-width: 280px;
-            box-shadow: 0 0 20px rgba(0,255,204,0.4);
-            border-radius: 3px;
-        }
+        .crucix-controls { position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; }
+        .ctrl-row { display: flex; gap: 4px; align-items: center; }
+        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 14px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; }
+        .crucix-btn:hover { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 8px #00ffccaa; }
+        .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
         .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
         .globe-tooltip a:hover { text-decoration: underline; }
     </style>
@@ -207,38 +156,18 @@ map_html = """
 <body>
     <div id="map-container">
         <div class="crucix-controls">
-            <div class="ctrl-row">
-                <button class="crucix-btn" onclick="zoomIn()">+</button>
-            </div>
-            <div class="ctrl-row">
-                <button class="crucix-btn" onclick="zoomOut()">-</button>
-            </div>
+            <div class="ctrl-row"><button class="crucix-btn" onclick="zoomIn()">+</button></div>
+            <div class="ctrl-row"><button class="crucix-btn" onclick="zoomOut()">-</button></div>
         </div>
     </div>
-
     <script>
         const data = __GLOBE_DATA_JSON__;
         const isFlat = __FLAT_MODE__;
-
-        const ringsData = data.map(d => ({
-            lat: d.lat,
-            lng: d.lon,
-            maxRadius: 4.0,
-            propagationSpeed: 2.5,
-            repeatPeriod: 1400
-        }));
-
+        const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
         const arcsData = data.map((d, i) => {
             const target = data[(i + 2) % data.length];
-            return {
-                startLat: d.lat,
-                startLng: d.lon,
-                endLat: target.lat,
-                endLng: target.lon,
-                color: ['#00ffcc', '#0044ff']
-            };
+            return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
         });
-
         const world = Globe()
             (document.getElementById('map-container'))
             .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
@@ -263,31 +192,14 @@ map_html = """
             .arcDashGap(0.2)
             .arcDashInitialGap(() => Math.random())
             .arcDashAnimateTime(2000)
-            .pointLabel(d => `
-                <div class="globe-tooltip">
-                    <b>[\${d.region.toUpperCase()}]</b><br>
-                    <a href="\${d.url}" target="_blank">\${d.title}</a><br>
-                    <hr style="border-color: #333; margin: 6px 0;">
-                    <span style="color: #888;">SRC: \${d.source} | \${d.date}</span>
-                </div>
-            `);
-
+            .pointLabel(d => `<div class="globe-tooltip"><b>[\${d.region.toUpperCase()}]</b><br><a href="\${d.url}" target="_blank">\${d.title}</b><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: \${d.source} | \${d.date}</span></div>`);
         const controls = world.controls();
         controls.autoRotate = !isFlat;
         controls.autoRotateSpeed = 0.7;
         controls.enableZoom = true;
-
         world.pointOfView({ lat: __POV_LAT__, lng: __POV_LNG__, altitude: __POV_ALT__ }, 1000);
-
-        function zoomIn() {
-            const pov = world.pointOfView();
-            world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500);
-        }
-
-        function zoomOut() {
-            const pov = world.pointOfView();
-            world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500);
-        }
+        function zoomIn() { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500); }
+        function zoomOut() { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); }
     </script>
 </body>
 </html>
@@ -303,33 +215,100 @@ map_html = (
 
 components.html(map_html, height=520)
 
-# Live News Ticker Box ala Crucix di Bawah Peta (Menampilkan SEMUA BERITA dalam wadah scrollable)
 st.markdown("---")
 
-ticker_cards_html = ""
-for item in news_items:
-    ticker_cards_html += f"""
-    <div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; transition: background 0.2s;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: 'Courier New', Courier, monospace; letter-spacing: 0.5px;">{item['source']}</span>
-            <span style="font-size: 10px; color: #777; font-family: 'Courier New', Courier, monospace;">{item['date']}</span>
-        </div>
-        <a href="{item['url']}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: 'Courier New', Courier, monospace; display: block; line-height: 1.4;">{item['title']}</a>
-        <div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">↗</div>
-    </div>
-    """
+# Layout 2 Kolom: Kiri = Live News Ticker (Auto-Scroll), Kanan = Kurs Mata Uang terhadap Rupiah (IDR)
+left_col, right_col = st.columns([1.3, 1])
 
-st.markdown(f"""
-<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-top: 10px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
-        <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; letter-spacing: 1px; color: #00ffcc;">LIVE NEWS TICKER</span>
-        <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace; font-weight: bold;">{len(news_items)} ITEMS</span>
+with left_col:
+    cards_html = ""
+    for item in news_items:
+        cards_html += f"""
+        <div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: 'Courier New', Courier, monospace;">{item['source']}</span>
+                <span style="font-size: 10px; color: #777; font-family: 'Courier New', Courier, monospace;">{item['date']}</span>
+            </div>
+            <a href="{item['url']}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: 'Courier New', Courier, monospace; display: block; line-height: 1.4;">{item['title']}</a>
+            <div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">↗</div>
+        </div>
+        """
+
+    st.markdown(f"""
+    <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span>
+            <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">{len(news_items)} ITEMS</span>
+        </div>
+        <div class="ticker-container" style="height: 480px; overflow: hidden; position: relative;">
+            <div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">
+                {cards_html}
+                {cards_html}
+            </div>
+        </div>
     </div>
-    <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
-        {ticker_cards_html}
+    <style>
+    @keyframes autoScroll {{
+        0% {{ transform: translateY(0); }}
+        100% {{ transform: translateY(-50%); }}
+    }}
+    .ticker-container:hover .ticker-track {{
+        animation-play-state: paused;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+with right_col:
+    st.markdown("#### 💱 KURS RUPIAH (IDR) TERHADAP VALUTA ASING")
+    st.markdown("""
+    <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
+        <div style="border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 15px; font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">
+            NILAI TUKAR MATA ASING / IDR
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-family: 'Courier New', Courier, monospace;">
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">USD / IDR</div>
+                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 16,250.00</div>
+                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.15%</div>
+            </div>
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">SGD / IDR</div>
+                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 12,100.50</div>
+                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.08%</div>
+            </div>
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">EUR / IDR</div>
+                <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 17,620.00</div>
+                <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.05%</div>
+            </div>
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">GBP / IDR</div>
+                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 20,615.30</div>
+                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.21%</div>
+            </div>
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">JPY / IDR</div>
+                <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 104.50</div>
+                <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.18%</div>
+            </div>
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">AUD / IDR</div>
+                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 10,750.25</div>
+                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.12%</div>
+            </div>
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">MYR / IDR</div>
+                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 3,650.00</div>
+                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.05%</div>
+            </div>
+            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+                <div style="font-size: 11px; color: #888;">CNY / IDR</div>
+                <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 2,280.10</div>
+                <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.03%</div>
+            </div>
+        </div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 # Footer & Watermark
 st.markdown("---")

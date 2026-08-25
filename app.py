@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 from deep_translator import GoogleTranslator
 from streamlit_autorefresh import st_autorefresh
-import pandas as pd
 import json
 import streamlit.components.v1 as components
 
@@ -64,7 +63,10 @@ def fetch_forex_rates():
                     val_in_idr = idr_per_usd
                 else:
                     val_in_usd = rates.get(cur, 1.0)
-                    val_in_idr = idr_per_usd / val_in_usd
+                    if val_in_usd:
+                        val_in_idr = idr_per_usd / val_in_usd
+                    else:
+                        val_in_idr = default_rates.get(cur, 1.0)
                 live_rates[cur] = val_in_idr
             return live_rates
     except Exception:
@@ -231,7 +233,7 @@ map_html = """
             .arcDashGap(0.2)
             .arcDashInitialGap(() => Math.random())
             .arcDashAnimateTime(2000)
-            .pointLabel(d => `<div class="globe-tooltip"><b>[\${d.region.toUpperCase()}]</b><br><a href="\${d.url}" target="_blank">\${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: \${d.source} | \${d.date}</span></div>`);
+            .pointLabel(d => `<div class="globe-tooltip"><b>[${d.region.toUpperCase()}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${d.source} | ${d.date}</span></div>`);
         const controls = world.controls();
         controls.autoRotate = !isFlat;
         controls.autoRotateSpeed = 0.7;

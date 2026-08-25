@@ -224,7 +224,9 @@ st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
-news_items = fetch_live_news()
+# Menggunakan st.spinner agar ada indikator loading saat pertama kali fetch data
+with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."):
+    news_items = fetch_live_news()
 
 # Inisialisasi Session State
 if "selected_region" not in st.session_state:
@@ -232,7 +234,7 @@ if "selected_region" not in st.session_state:
 if "flat_mode" not in st.session_state:
     st.session_state.flat_mode = False
 
-# --- KONTROL TOMBOL DI ATAS PETA (MENU & MODE/ZOOM) MENGGUNAKAN STREAMLIT NATIF ---
+# --- KONTROL TOMBOL DI ATAS PETA (MENU & MODE/ZOOM) ---
 menu_cols = st.columns(6)
 regions = [
     ("world", "WORLD"),
@@ -251,7 +253,6 @@ for i, (reg_key, reg_name) in enumerate(regions):
             st.session_state.selected_region = reg_key
             st.rerun()
 
-# Baris kedua: Tombol Zoom (+, -) dan Mode Switcher di kiri atas peta
 ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col_rest = st.columns([0.5, 0.5, 2.0, 7.0])
 with ctrl_col1:
     if st.button("+", use_container_width=True, key="zoom_in_btn"):
@@ -262,7 +263,7 @@ with ctrl_col2:
         st.session_state["zoom_action"] = "out"
         st.rerun()
 with ctrl_col3:
-    mode_label = "FLAT MODE" if st.session_state.flat_mode else "GLOBE MODE"
+    mode_label = "GLOBE MODE" if st.session_state.flat_mode else "FLAT MODE"
     if st.button(mode_label, use_container_width=True, key="mode_switch_btn"):
         st.session_state.flat_mode = not st.session_state.flat_mode
         st.rerun()
@@ -287,7 +288,6 @@ if "zoom_action" in st.session_state:
     elif action == "out":
         zoom_cmd = "window.zoomOut && window.zoomOut();"
 
-# Menggunakan String Biasa agar kurung kurawal JS tidak memicu error f-string
 map_html = """
 <!DOCTYPE html>
 <html>
@@ -452,7 +452,6 @@ map_html = """
 </html>
 """
 
-# Mengganti placeholder secara aman
 map_html = (
     map_html.replace("__GLOBE_DATA_JSON__", globe_json)
     .replace("__POV_LAT__", str(pov_lat))

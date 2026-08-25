@@ -21,7 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Sembunyikan Header Streamlit & Atur Tema Terminal (Tombol Dibuat Gelap agar Tidak Silau)
+# Sembunyikan Header Streamlit & Atur Tema Terminal
 st.markdown("""
 <style>
     header {visibility: hidden !important; display: none !important;}
@@ -235,7 +235,6 @@ def fetch_live_news():
     store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
     return fallback_data
 
-# Fungsi Aman untuk Mengambil Data Darkweb / Ransomware Leaks
 def fetch_darkweb_leaks():
     store = _get_cache_store("darkweb_v1")
     now = time.time()
@@ -545,9 +544,9 @@ with right_col:
         forex_cards_html += f'<div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;"><span><b>{code} / IDR</b> ({name})</span><span style="color: #00ffcc;">LIVE 1H</span></div><div style="display: flex; justify-content: space-between; font-size: 12px; font-family: \'Courier New\', Courier, monospace;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div></div></div>'
 
     forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
-    st.markdown(forex_widget_html, unsafe_allow_html=True)
+    st.markdown(forex_widget_html, unsafe_allow_html=True)  # <-- DITAMBAHKAN unsafe_allow_html=True
 
-    # 2. Widget Darkweb & Ransomware Leaks (Render HTML Aman)
+    # 2. Widget Darkweb & Ransomware Leaks (Render HTML dengan unsafe_allow_html=True)
     darkweb_cards_html = ""
     for dw in darkweb_items:
         darkweb_cards_html += f'''
@@ -572,7 +571,7 @@ with right_col:
         </div>
     </div>
     """
-    st.markdown(darkweb_widget_html, unsafe_allow_html=True)
+    st.markdown(darkweb_widget_html, unsafe_allow_html=True)  # <-- DITAMBAHKAN unsafe_allow_html=True
 
 st.markdown("---")
 footer_col1, footer_col2 = st.columns([2, 1])

@@ -37,6 +37,7 @@ st.markdown("""
         border: 1px solid #1a3630 !important;
         font-family: 'Courier New', Courier, monospace !important;
         font-weight: bold !important;
+        width: 100%;
     }
     div.stButton > button:hover {
         background-color: #132622 !important;
@@ -234,51 +235,52 @@ def fetch_live_news():
     store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
     return fallback_data
 
-# Fungsi untuk Mengambil Data Live Darkweb / Ransomware dari Ransomware.live API
+# Fungsi Aman untuk Mengambil Data Darkweb / Ransomware Leaks
 def fetch_darkweb_leaks():
     store = _get_cache_store("darkweb_v1")
     now = time.time()
-    if store["data"] is not None and (now - store["timestamp"]) < 1800: # Cache 30 menit
+    if store["data"] is not None and (now - store["timestamp"]) < 1800:
         return store["data"]
     
+    default_fallback = [
+        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live Feed"},
+        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live Feed"},
+        {"group": "RansomHub", "target": "Corporate Network System", "country": "INT", "date": "Live Feed"}
+    ]
+
     try:
         url = "https://api.ransomware.live/v2/recentvictims"
-        res = requests.get(url, timeout=6)
+        res = requests.get(url, timeout=5)
         if res.status_code == 200:
             victims = res.json()
-            parsed_data = []
-            for v in victims[:15]: # Ambil 15 data terbaru
-                parsed_data.append({
-                    "group": v.get("group_name", "Unknown Gang"),
-                    "target": v.get("post_title", v.get("target", "Target Confirmed")),
-                    "country": v.get("country", "INT").upper(),
-                    "date": v.get("published", "Recent")[:10]
-                })
-            if parsed_data:
-                store["data"] = parsed_data
-                store["timestamp"] = now
-                store["is_live"] = True
-                return parsed_data
+            if isinstance(victims, list) and len(victims) > 0:
+                parsed_data = []
+                for v in victims[:15]:
+                    if isinstance(v, dict):
+                        parsed_data.append({
+                            "group": str(v.get("group_name", "Unknown Gang")),
+                            "target": str(v.get("post_title", v.get("target", "Target Confirmed"))),
+                            "country": str(v.get("country", "INT")).upper(),
+                            "date": str(v.get("published", "Recent"))[:10]
+                        })
+                if parsed_data:
+                    store["data"] = parsed_data
+                    store["timestamp"] = now
+                    store["is_live"] = True
+                    return parsed_data
     except Exception:
         pass
     
-    # Fallback jika API gagal/timeout
-    fallback = store["data"] if store["data"] is not None else [
-        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live Feed"},
-        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live Feed"}
-    ]
-    return fallback
+    return store["data"] if store["data"] is not None else default_fallback
 
 st.markdown("### ⚡ ManTam // GLOBAL & REGIONAL TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · UPDATES EVERY 1H</span>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Menggunakan st.spinner agar ada indikator loading saat pertama kali fetch data
 with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."):
     news_items = fetch_live_news()
     darkweb_items = fetch_darkweb_leaks()
 
-# Inisialisasi Session State
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "world"
 if "flat_mode" not in st.session_state:
@@ -299,22 +301,22 @@ for i, (reg_key, reg_name) in enumerate(regions):
     with menu_cols[i]:
         is_active = (st.session_state.selected_region == reg_key)
         btn_label = f"🟢 {reg_name}" if is_active else reg_name
-        if st.button(btn_label, use_container_width=True, key=f"reg_{reg_key}"):
+        if st.button(btn_label, key=f"reg_{reg_key}"):
             st.session_state.selected_region = reg_key
             st.rerun()
 
 ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col_rest = st.columns([0.5, 0.5, 2.0, 7.0])
 with ctrl_col1:
-    if st.button("+", use_container_width=True, key="zoom_in_btn"):
+    if st.button("+", key="zoom_in_btn"):
         st.session_state["zoom_action"] = "in"
         st.rerun()
 with ctrl_col2:
-    if st.button("-", use_container_width=True, key="zoom_out_btn"):
+    if st.button("-", key="zoom_out_btn"):
         st.session_state["zoom_action"] = "out"
         st.rerun()
 with ctrl_col3:
     mode_label = "GLOBE MODE" if st.session_state.flat_mode else "FLAT MODE"
-    if st.button(mode_label, use_container_width=True, key="mode_switch_btn"):
+    if st.button(mode_label, key="mode_switch_btn"):
         st.session_state.flat_mode = not st.session_state.flat_mode
         st.rerun()
 
@@ -545,16 +547,16 @@ with right_col:
     forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
-    # 2. Widget Darkweb & Ransomware Leaks (Live from Ransomware.live API)
+    # 2. Widget Darkweb & Ransomware Leaks (Render HTML Aman)
     darkweb_cards_html = ""
     for dw in darkweb_items:
         darkweb_cards_html += f'''
         <div style="background: #080808; border: 1px solid #2a1616; border-left: 3px solid #ff3333; padding: 10px 12px; margin-bottom: 8px;">
             <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ff6666; border-bottom: 1px solid #1f1a1a; padding-bottom: 4px; margin-bottom: 6px;">
-                <span><b>GANG: {dw["group"]}</b></span>
-                <span>[{dw["country"]}] {dw["date"]}</span>
+                <span><b>GANG: {dw.get("group", "Unknown")}</b></span>
+                <span>[{dw.get("country", "INT")}] {dw.get("date", "Recent")}</span>
             </div>
-            <div style="font-size: 12px; color: #ddd; margin-bottom: 4px;">Target: <b>{dw["target"]}</b></div>
+            <div style="font-size: 12px; color: #ddd; margin-bottom: 4px;">Target: <b>{dw.get("target", "Target Confirmed")}</b></div>
             <div style="font-size: 10px; color: #ff3333; font-weight: bold;">STATUS: [DATA LEAKED / EXTORTION]</div>
         </div>
         '''

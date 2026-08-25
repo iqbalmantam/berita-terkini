@@ -6,15 +6,12 @@ from streamlit_autorefresh import st_autorefresh
 import json
 
 # TTL cache: 1 jam kalau fetch terakhir SUKSES, 5 menit kalau terakhir GAGAL
-# (biar cepat retry, tidak nyangkut di fallback statis selama 1 jam penuh)
 LIVE_TTL = 3600
 RETRY_TTL = 300
 
-
 @st.cache_resource
 def _get_cache_store(name: str):
-    """Wadah state persisten lintas rerun & lintas user (mirip st.cache_data,
-    tapi TTL-nya kita kontrol manual sesuai sukses/gagalnya fetch terakhir)."""
+    """Wadah state persisten lintas rerun & lintas user"""
     return {"data": None, "timestamp": 0.0, "is_live": False}
 
 # Konfigurasi Halaman (Full Width)
@@ -53,11 +50,7 @@ def get_translator():
 
 translator = get_translator()
 
-
 def translate_title(text: str, max_retries: int = 2) -> str:
-    """Terjemahkan judul ke Indonesia dengan retry + backoff singkat.
-    Kalau semua percobaan gagal (rate-limit/blokir/timeout), balik ke teks asli
-    supaya berita tetap tampil (tidak kosong), cuma tidak terjemahan."""
     for attempt in range(max_retries):
         try:
             result = translator.translate(text)
@@ -65,7 +58,7 @@ def translate_title(text: str, max_retries: int = 2) -> str:
                 return result
         except Exception:
             pass
-        time.sleep(0.4 * (attempt + 1))  # backoff singkat sebelum coba lagi
+        time.sleep(0.4 * (attempt + 1))
     return text
 
 # Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
@@ -108,8 +101,6 @@ def fetch_forex_rates():
     except Exception:
         pass
 
-    # Fetch gagal -> pakai data live terakhir yang masih ada (kalau ada),
-    # kalau belum pernah sukses sama sekali baru pakai default_rates.
     fallback = store["data"] if store["data"] is not None else default_rates
     store["data"] = fallback
     store["timestamp"] = now
@@ -142,12 +133,15 @@ def fetch_live_news():
     articles_list = []
     error_reason = None
     url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
     response = None
-    # GDELT kadang lambat merespons -> coba lagi dengan timeout lebih longgar
-    # sebelum menyerah, daripada langsung fallback di percobaan pertama.
     for timeout_s in (10, 20):
         try:
-            response = requests.get(url, timeout=timeout_s)
+            response = requests.get(url, headers=headers, timeout=timeout_s)
             error_reason = None
             break
         except requests.exceptions.Timeout:
@@ -169,7 +163,7 @@ def fetch_live_news():
                 try:
                     data = response.json()
                 except ValueError:
-                    error_reason = f"Respons GDELT bukan JSON valid (potongan: {response.text[:120]!r})"
+                    error_reason = "Respons GDELT bukan JSON valid"
 
             articles = data.get("articles", [])
             if not articles and not error_reason:
@@ -180,8 +174,12 @@ def fetch_live_news():
                 title_en = art.get("title", "")
                 if not title_en:
                     continue
-                title_id = translate_title(title_en)
-                time.sleep(0.15)  # jeda kecil antar-artikel, hindari burst request
+                try:
+                    title_id = translate_title(title_en)
+                except Exception:
+                    title_id = title_en
+
+                time.sleep(0.1)
                 assigned_region = regions_pool[idx % len(regions_pool)]
                 articles_list.append({
                     "title": title_id,
@@ -195,18 +193,14 @@ def fetch_live_news():
     except Exception as e:
         error_reason = error_reason or f"Error saat memproses artikel: {type(e).__name__}: {e}"
 
-    if len(articles_list) >= 8:
-        # Fetch sukses dengan hasil cukup banyak -> simpan sebagai data live, TTL 1 jam
+    if len(articles_list) >= 5:
         store["data"] = articles_list
         store["timestamp"] = now
         store["is_live"] = True
         store["last_error"] = None
         return articles_list
 
-    # Fetch gagal / hasil terlalu sedikit -> pakai data live terakhir yang masih
-    # ada (kalau ada), baru jatuh ke DEFAULT_OSINT_DATA kalau belum pernah sukses.
-    # TTL dipersingkat jadi 5 menit supaya cepat dicoba ulang.
-    store["last_error"] = error_reason or f"Cuma {len(articles_list)} artikel valid (minimal butuh 8)"
+    store["last_error"] = error_reason or f"Cuma {len(articles_list)} artikel valid (minimal butuh 5)"
     fallback = store["data"] if store["data"] is not None else (articles_list + DEFAULT_OSINT_DATA)
     store["data"] = fallback
     store["timestamp"] = now
@@ -308,9 +302,8 @@ map_html = """
             const target = data[(i + 2) % data.length];
             return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
         });
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.region.toUpperCase()}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${d.source} | ${d.date}</span></div>`;
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[\${d.region.toUpperCase()}]</b><br><a href="\${d.url}" target="_blank">\${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: \${d.source} | \${d.date}</span></div>`;
 
-        // ---------- MODE 1: GLOBE 3D ----------
         function buildGlobe() {
             const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
@@ -345,7 +338,6 @@ map_html = """
             window.zoomOut = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); };
         }
 
-        // ---------- MODE 2: PETA DATAR 2D (proyeksi equirectangular asli) ----------
         function buildFlatMap() {
             const width = container.clientWidth || 900;
             const height = 500;
@@ -381,7 +373,7 @@ map_html = """
                         .attr('d', geoPath)
                         .attr('fill', '#0a1a16').attr('stroke', '#00ffcc44').attr('stroke-width', 0.6);
                 })
-                .catch(() => { /* peta negara opsional; titik & garis tetap tampil tanpa itu */ })
+                .catch(() => {})
                 .finally(() => drawPointsAndArcs());
 
             function drawPointsAndArcs() {
@@ -392,7 +384,7 @@ map_html = """
                     if (!p1 || !p2) return;
                     const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2 - 45;
                     arcsG.append('path')
-                        .attr('d', `M${p1[0]},${p1[1]} Q${mx},${my} ${p2[0]},${p2[1]}`)
+                        .attr('d', `M\${p1[0]},\${p1[1]} Q\${mx},\${my} \${p2[0]},\${p2[1]}`)
                         .attr('fill', 'none').attr('stroke', '#00ffcc55').attr('stroke-width', 1);
                 });
 

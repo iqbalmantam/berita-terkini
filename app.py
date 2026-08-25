@@ -5,6 +5,8 @@ from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 import json
 import streamlit.components.v1 as components
+import folium
+from streamlit_folium import st_folium
 
 # Konfigurasi Halaman (Full Width)
 st.set_page_config(
@@ -13,7 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Sembunyikan Header Streamlit / Logo GitHub / Menu Utama secara Total via CSS
+# Sembunyikan Header Streamlit / Logo GitHub / Menu secara Total via CSS
 st.markdown("""
 <style>
     header {visibility: hidden !important; display: none !important;}
@@ -127,191 +129,186 @@ def fetch_live_news():
     return articles_list + DEFAULT_OSINT_DATA
 
 st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
-st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING 3D GLOBE ENGINE · LIVE INTEL FEED · AUTO-TRANSLATE ACTIVE</span>", unsafe_allow_html=True)
+st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()
 
-# Menu Tombol Wilayah di Atas Peta (Gaya Crucix)
-st.markdown("<br>", unsafe_allow_html=True)
-col_btn1, col_btn2, col_btn3, col_btn4, col_btn5, col_btn6 = st.columns(6)
-
+# Inisialisasi Session State
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "world"
+if "flat_mode" not in st.session_state:
+    st.session_state.flat_mode = False
 
-with col_btn1:
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Menu Navigasi Wilayah & Tombol Flat Mode di Atas Peta (7 Kolom)
+col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+
+with col1:
     if st.button("WORLD", use_container_width=True):
         st.session_state.selected_region = "world"
-with col_btn2:
+with col2:
     if st.button("AMERICAS", use_container_width=True):
         st.session_state.selected_region = "americas"
-with col_btn3:
+with col3:
     if st.button("EUROPE", use_container_width=True):
         st.session_state.selected_region = "europe"
-with col_btn4:
+with col4:
     if st.button("MIDDLE EAST", use_container_width=True):
         st.session_state.selected_region = "middle_east"
-with col_btn5:
+with col5:
     if st.button("ASIA PACIFIC", use_container_width=True):
         st.session_state.selected_region = "asia_pacific"
-with col_btn6:
+with col6:
     if st.button("AFRICA", use_container_width=True):
         st.session_state.selected_region = "africa"
+with col7:
+    flat_label = "FLAT: ON" if st.session_state.flat_mode else "FLAT: OFF"
+    if st.button(flat_label, use_container_width=True):
+        st.session_state.flat_mode = not st.session_state.flat_mode
+        st.rerun()
 
 current_region = st.session_state.selected_region
 
-# Filter berita berdasarkan wilayah yang dipilih
+# Filter berita berdasarkan wilayah
 if current_region == "world":
     filtered_news = news_items
     pov_lat, pov_lng, pov_alt = 0, 0, 2.5
+    map_center = [20.0, 0.0]
+    map_zoom = 2
 else:
     filtered_news = [item for item in news_items if item["region"] == current_region]
     if not filtered_news:
         filtered_news = news_items
     viewpoints = {
-        "americas": (20, -90, 1.6),
-        "europe": (50, 10, 1.4),
-        "middle_east": (25, 45, 1.4),
-        "asia_pacific": (10, 115, 1.6),
-        "africa": (0, 20, 1.6)
+        "americas": (20, -90, 1.6, [20.0, -90.0], 3),
+        "europe": (50, 10, 1.4, [50.0, 10.0], 4),
+        "middle_east": (25, 45, 1.4, [25.0, 45.0], 4),
+        "asia_pacific": (10, 115, 1.6, [10.0, 115.0], 3),
+        "africa": (0, 20, 1.6, [0.0, 20.0], 3)
     }
-    pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
+    vp = viewpoints.get(current_region, (0, 0, 2.5, [20.0, 0.0], 2))
+    pov_lat, pov_lng, pov_alt, map_center, map_zoom = vp[0], vp[1], vp[2], vp[3], vp[4]
 
 globe_json = json.dumps(filtered_news)
 
-# HTML Globe 3D (Aman dari SyntaxError Python)
-globe_html = """
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        #globe-container { width: 100%; height: 500px; position: relative; }
-        .ui-controls { position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; gap: 6px; }
-        .ctrl-btn { background: rgba(5,5,5,0.85); border: 1px solid #00ffcc66; color: #00ffcc; padding: 6px 12px; font-family: 'Courier New', Courier, monospace; font-size: 11px; cursor: pointer; border-radius: 2px; }
-        .ctrl-btn:hover { border-color: #00ffcc; background: #00ffcc22; }
-        .globe-tooltip {
-            background: rgba(10, 10, 10, 0.95);
-            border: 1px solid #00ffcc;
-            color: #fff;
-            padding: 10px 14px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 11px;
-            max-width: 280px;
-            box-shadow: 0 0 20px rgba(0,255,204,0.4);
-            border-radius: 3px;
-        }
-        .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
-        .globe-tooltip a:hover { text-decoration: underline; }
-    </style>
-    <script src="https://unpkg.com/three"></script>
-    <script src="https://unpkg.com/globe.gl"></script>
-</head>
-<body>
-    <div id="globe-container">
-        <div class="ui-controls">
-            <button class="ctrl-btn" onclick="zoomIn()">+</button>
-            <button class="ctrl-btn" onclick="zoomOut()">-</button>
-            <button class="ctrl-btn" onclick="toggleFlatMode()" id="flat-btn">FLAT MODE: OFF</button>
+# Render Peta: 3D Globe atau 2D Flat Map (Folium) sesuai pilihan Flat Mode
+if st.session_state.flat_mode:
+    # Mode Peta Datar (Flat Map) menggunakan Folium tema gelap
+    m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter")
+    for item in filtered_news:
+        popup_html = f"""
+        <div style="width: 220px; font-size: 11px; font-family: monospace;">
+            <b>[{item['region'].upper()}]</b><br>
+            <a href="{item['url']}" target="_blank"><b>{item['title']}</b></a><br>
+            <hr style="margin: 5px 0;">
+            <span style="color: gray;">SRC: {item['source']} | {item['date']}</span>
         </div>
-    </div>
-
-    <script>
-        const data = __GLOBE_DATA_JSON__;
-
-        const ringsData = data.map(d => ({
-            lat: d.lat,
-            lng: d.lon,
-            maxRadius: 4.0,
-            propagationSpeed: 2.5,
-            repeatPeriod: 1400
-        }));
-
-        const arcsData = data.map((d, i) => {
-            const target = data[(i + 2) % data.length];
-            return {
-                startLat: d.lat,
-                startLng: d.lon,
-                endLat: target.lat,
-                endLng: target.lon,
-                color: ['#00ffcc', '#0044ff']
-            };
-        });
-
-        const world = Globe()
-            (document.getElementById('globe-container'))
-            .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
-            .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-            .backgroundColor('#050505')
-            .pointsData(data)
-            .pointLat(d => d.lat)
-            .pointLng(d => d.lon)
-            .pointColor(() => '#00ffcc')
-            .pointAltitude(0.09)
-            .pointRadius(0.55)
-            .ringsData(ringsData)
-            .ringColor(() => '#00ffcc')
-            .ringMaxRadius('maxRadius')
-            .ringPropagationSpeed('propagationSpeed')
-            .ringRepeatPeriod('repeatPeriod')
-            .arcsData(arcsData)
-            .arcColor('color')
-            .arcDashLength(0.4)
-            .arcDashGap(0.2)
-            .arcDashInitialGap(() => Math.random())
-            .arcDashAnimateTime(2000)
-            .pointLabel(d => `
-                <div class="globe-tooltip">
-                    <b>[\${d.region.toUpperCase()}]</b><br>
-                    <a href="\${d.url}" target="_blank">\${d.title}</a><br>
-                    <hr style="border-color: #333; margin: 6px 0;">
-                    <span style="color: #888;">SRC: \${d.source} | \${d.date}</span>
-                </div>
-            `);
-
-        const controls = world.controls();
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.7;
-        controls.enableZoom = true;
-
-        world.pointOfView({ lat: __POV_LAT__, lng: __POV_LNG__, altitude: __POV_ALT__ }, 1000);
-
-        function zoomIn() {
-            const pov = world.pointOfView();
-            world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500);
-        }
-
-        function zoomOut() {
-            const pov = world.pointOfView();
-            world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500);
-        }
-
-        let flatMode = false;
-        function toggleFlatMode() {
-            flatMode = !flatMode;
-            const btn = document.getElementById('flat-btn');
-            if (flatMode) {
-                btn.innerText = "FLAT MODE: ON";
-                btn.style.background = "#00ffcc22";
-                world.pointOfView({ lat: 0, lng: 110, altitude: 3.2 }, 1000);
-            } else {
-                btn.innerText = "FLAT MODE: OFF";
-                btn.style.background = "rgba(5,5,5,0.85)";
-                world.pointOfView({ lat: 0, lng: 0, altitude: 2.5 }, 1000);
+        """
+        folium.Marker(
+            location=[item["lat"], item["lon"]],
+            popup=folium.Popup(popup_html, max_width=250),
+            icon=folium.Icon(color="darkred", icon="info-sign")
+        ).add_to(m)
+    st_folium(m, width="100%", height=500)
+else:
+    # Mode Bola Dunia 3D (Globe 3D)
+    globe_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
+            #globe-container { width: 100%; height: 500px; position: relative; }
+            .globe-tooltip {
+                background: rgba(10, 10, 10, 0.95);
+                border: 1px solid #00ffcc;
+                color: #fff;
+                padding: 10px 14px;
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 11px;
+                max-width: 280px;
+                box-shadow: 0 0 20px rgba(0,255,204,0.4);
+                border-radius: 3px;
             }
-        }
-    </script>
-</body>
-</html>
-"""
+            .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
+            .globe-tooltip a:hover { text-decoration: underline; }
+        </style>
+        <script src="https://unpkg.com/three"></script>
+        <script src="https://unpkg.com/globe.gl"></script>
+    </head>
+    <body>
+        <div id="globe-container"></div>
+        <script>
+            const data = __GLOBE_DATA_JSON__;
 
-globe_html = (
-    globe_html.replace("__GLOBE_DATA_JSON__", globe_json)
-    .replace("__POV_LAT__", str(pov_lat))
-    .replace("__POV_LNG__", str(pov_lng))
-    .replace("__POV_ALT__", str(pov_alt))
-)
+            const ringsData = data.map(d => ({
+                lat: d.lat,
+                lng: d.lon,
+                maxRadius: 4.0,
+                propagationSpeed: 2.5,
+                repeatPeriod: 1400
+            }));
 
-components.html(globe_html, height=520)
+            const arcsData = data.map((d, i) => {
+                const target = data[(i + 2) % data.length];
+                return {
+                    startLat: d.lat,
+                    startLng: d.lon,
+                    endLat: target.lat,
+                    endLng: target.lon,
+                    color: ['#00ffcc', '#0044ff']
+                };
+            });
+
+            const world = Globe()
+                (document.getElementById('globe-container'))
+                .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+                .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+                .backgroundColor('#050505')
+                .pointsData(data)
+                .pointLat(d => d.lat)
+                .pointLng(d => d.lon)
+                .pointColor(() => '#00ffcc')
+                .pointAltitude(0.09)
+                .pointRadius(0.55)
+                .ringsData(ringsData)
+                .ringColor(() => '#00ffcc')
+                .ringMaxRadius('maxRadius')
+                .ringPropagationSpeed('propagationSpeed')
+                .ringRepeatPeriod('repeatPeriod')
+                .arcsData(arcsData)
+                .arcColor('color')
+                .arcDashLength(0.4)
+                .arcDashGap(0.2)
+                .arcDashInitialGap(() => Math.random())
+                .arcDashAnimateTime(2000)
+                .pointLabel(d => `
+                    <div class="globe-tooltip">
+                        <b>[\${d.region.toUpperCase()}]</b><br>
+                        <a href="\${d.url}" target="_blank">\${d.title}</a><br>
+                        <hr style="border-color: #333; margin: 6px 0;">
+                        <span style="color: #888;">SRC: \${d.source} | \${d.date}</span>
+                    </div>
+                `);
+
+            const controls = world.controls();
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.7;
+            controls.enableZoom = true;
+
+            world.pointOfView({ lat: __POV_LAT__, lng: __POV_LNG__, altitude: __POV_ALT__ }, 1000);
+        </script>
+    </body>
+    </html>
+    """
+    globe_html = (
+        globe_html.replace("__GLOBE_DATA_JSON__", globe_json)
+        .replace("__POV_LAT__", str(pov_lat))
+        .replace("__POV_LNG__", str(pov_lng))
+        .replace("__POV_ALT__", str(pov_alt))
+    )
+    components.html(globe_html, height=520)
 
 # Live News Ticker & Feed di Bawah Peta
 st.markdown("---")

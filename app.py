@@ -57,17 +57,15 @@ def translate_title(text: str, max_retries: int = 2) -> str:
     for attempt in range(max_retries):
         try:
             result = translator.translate(text)
-            # Filter output sampah: Pastikan tidak ada keyword error di hasil terjemahan
             if result and not any(err in result for err in error_keywords):
                 return result
         except Exception:
             pass
         time.sleep(0.4 * (attempt + 1))
-    return text  # Jika gagal diterjemahkan, biarkan bahasa Inggris aslinya.
+    return text
 
 # Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
 def fetch_forex_rates():
-    # Menggunakan cache key "forex_v2" untuk force reset
     store = _get_cache_store("forex_v2")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
@@ -116,7 +114,6 @@ forex_rates = fetch_forex_rates()
 
 # Fungsi Berita 100% Online (TIDAK ADA DATA STATIS)
 def fetch_live_news():
-    # MENGGUNAKAN CACHE KEY BARU "news_v2" AGAR MEMORI LAMA (YANG BERISI ERROR) TERHAPUS
     store = _get_cache_store("news_v2")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
@@ -217,8 +214,7 @@ def fetch_live_news():
         store.update({"data": alj_list, "timestamp": now, "is_live": True, "source": "AL JAZEERA", "last_error": " | ".join(error_logs)})
         return alj_list
 
-    # --- JIKA KONEKSI INTERNET BENAR-BENAR TERPUTUS (TIDAK ADA DATA STATIS) ---
-    # Memunculkan satu item notifikasi error agar UI terminal tidak crash
+    # --- JIKA KONEKSI INTERNET BENAR-BENAR TERPUTUS ---
     error_item = [{
         "title": "KONEKSI TERPUTUS ATAU SELURUH API DIBLOKIR SEMENTARA.", 
         "url": "#", "source": "SYSTEM ALERT", "date": "NOW",
@@ -235,17 +231,7 @@ st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL EN
 news_items = fetch_live_news()
 _news_status = _get_cache_store("news_v2")
 
-# Indikator Status Terminal
-if _news_status.get("is_live"):
-    src = _news_status.get("source", "")
-    if src == "GDELT":
-        st.markdown("<span style='color:#00ffcc; font-size:0.78em;'>● LIVE ENGINE: GDELT PRIMARY — Connected</span>", unsafe_allow_html=True)
-    elif src in ["BBC", "AL JAZEERA"]:
-        err = _news_status.get("last_error", "")
-        st.markdown(f"<span style='color:#00ffcc; font-size:0.78em;'>● LIVE ENGINE: {src} BACKUP ACTIVE — (Primary Down: {err})</span>", unsafe_allow_html=True)
-else:
-    _reason = _news_status.get("last_error", "Tidak diketahui")
-    st.markdown(f"<span style='color:#ffaa00; font-size:0.78em;'>● OFFLINE MODE: KONEKSI TERPUTUS — ({_reason})</span>", unsafe_allow_html=True)
+# BAGIAN INDIKATOR STATUS (TULISAN LIVE/BACKUP/ERROR) TELAH DIHAPUS SEPENUHNYA DI SINI
 
 # Inisialisasi Session State
 if "selected_region" not in st.session_state:

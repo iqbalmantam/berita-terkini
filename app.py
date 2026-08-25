@@ -156,7 +156,7 @@ def fetch_live_news():
                     "title": title_id, "url": art.get("url", "#"),
                     "source": art.get("source", "GDELT").upper(), "date": "1h ago",
                     "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
-                    "region": assigned_region
+                    "region": assigned_region, "type": "news"
                 })
         else:
             error_logs.append(f"GDELT HTTP {res_gdelt.status_code}")
@@ -185,7 +185,7 @@ def fetch_live_news():
                     "title": title_id, "url": item.get("link", "#"),
                     "source": "BBC NEWS", "date": "LIVE BACKUP",
                     "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
-                    "region": assigned_region
+                    "region": assigned_region, "type": "news"
                 })
         else:
             error_logs.append(f"BBC HTTP {res_bbc.status_code}")
@@ -214,7 +214,7 @@ def fetch_live_news():
                     "title": title_id, "url": item.get("link", "#"),
                     "source": "AL JAZEERA", "date": "LIVE BACKUP",
                     "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
-                    "region": assigned_region
+                    "region": assigned_region, "type": "news"
                 })
         else:
             error_logs.append(f"ALJ HTTP {res_alj.status_code}")
@@ -228,7 +228,7 @@ def fetch_live_news():
     error_item = [{
         "title": "KONEKSI TERPUTUS ATAU SELURUH API DIBLOKIR SEMENTARA.", 
         "url": "#", "source": "SYSTEM ALERT", "date": "NOW",
-        "lat": 0.0, "lon": 0.0, "region": "world"
+        "lat": 0.0, "lon": 0.0, "region": "world", "type": "news"
     }]
     
     fallback_data = store["data"] if store["data"] is not None else error_item
@@ -287,6 +287,33 @@ with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."
     news_items = fetch_live_news()
     darkweb_items = fetch_darkweb_leaks()
 
+# Mapping Koordinat Negara untuk Data Darkweb
+COUNTRY_COORDS = {
+    "US": (37.0902, -95.7129), "GB": (55.3781, -3.4360), "CA": (56.1304, -106.3468),
+    "FR": (46.2276, 2.2137), "DE": (51.1657, 10.4515), "BR": (-14.2350, -51.9253),
+    "AU": (-25.2744, 133.7751), "IT": (41.8719, 12.5674), "ES": (40.4637, -3.7492),
+    "JP": (36.2048, 138.2529), "CN": (35.8617, 104.1954), "ZA": (-30.5595, 22.9375),
+    "AR": (-38.4161, -63.6167), "AE": (23.4241, 53.8478), "INT": (0.0, 0.0), "EU": (50.8503, 4.3517)
+}
+
+# Gabungkan Darkweb Leaks ke dalam Data Peta Globe/Map
+darkweb_map_items = []
+for d in darkweb_items:
+    cc = d.get("country", "INT")
+    lat, lon = COUNTRY_COORDS.get(cc, (20.0 + (hash(d["target"]) % 30) - 15, 0.0 + (hash(d["target"]) % 180) - 90))
+    darkweb_map_items.append({
+        "title": f"[{d['group']}] Target: {d['target']} [DATA LEAKED]",
+        "url": d.get("url", "#"),
+        "source": f"DARKWEB ({cc})",
+        "date": d.get("date", "Recent"),
+        "lat": lat,
+        "lon": lon,
+        "region": "world",
+        "type": "darkweb"
+    })
+
+globe_data_combined = news_items + darkweb_map_items
+
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "world"
 if "flat_mode" not in st.session_state:
@@ -336,7 +363,7 @@ viewpoints = {
     "africa": (0, 20, 1.6)
 }
 pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
-globe_json = json.dumps(news_items)
+globe_json = json.dumps(globe_data_combined)
 
 zoom_cmd = ""
 if "zoom_action" in st.session_state:
@@ -371,15 +398,15 @@ map_html = """
         const povLat = __POV_LAT__, povLng = __POV_LNG__, povAlt = __POV_ALT__;
         const container = document.getElementById('map-container');
         
-        const arcsData = data.map((d, i) => {
+        const arcsData = data.filter(d => d.type !== 'darkweb').map((d, i) => {
             const target = data[(i + 2) % data.length];
             return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
         });
         
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.region.toUpperCase()}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${d.source} | ${d.date}</span></div>`;
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.source}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">DATE: ${d.date}</span></div>`;
 
         function buildGlobe() {
-            const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
+            const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: d.type === 'darkweb' ? 5.0 : 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
                 (container)
                 .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
@@ -388,11 +415,11 @@ map_html = """
                 .pointsData(data)
                 .pointLat(d => d.lat)
                 .pointLng(d => d.lon)
-                .pointColor(() => '#00ffcc')
-                .pointAltitude(0.09)
-                .pointRadius(0.55)
+                .pointColor(d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
+                .pointAltitude(d => d.type === 'darkweb' ? 0.12 : 0.09)
+                .pointRadius(d => d.type === 'darkweb' ? 0.75 : 0.55)
                 .ringsData(ringsData)
-                .ringColor(() => '#00ffcc')
+                .ringColor(d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
                 .ringMaxRadius('maxRadius')
                 .ringPropagationSpeed('propagationSpeed')
                 .ringRepeatPeriod('repeatPeriod')
@@ -481,8 +508,10 @@ map_html = """
                 contentLayer.append('g').selectAll('circle').data(data).join('circle')
                     .attr('cx', d => projection([d.lon, d.lat])[0])
                     .attr('cy', d => projection([d.lon, d.lat])[1])
-                    .attr('r', 5).attr('fill', '#00ffcc')
-                    .attr('stroke', '#00ffcc').attr('stroke-width', 7).attr('stroke-opacity', 0.2)
+                    .attr('r', d => d.type === 'darkweb' ? 6 : 5)
+                    .attr('fill', d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
+                    .attr('stroke', d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
+                    .attr('stroke-width', 7).attr('stroke-opacity', 0.2)
                     .style('cursor', 'pointer')
                     .on('mouseenter', function (event, d) {
                         tooltip.style('opacity', 1).html(tooltipHtml(d));
@@ -553,7 +582,7 @@ with right_col:
     forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
-    # 2. Widget Darkweb Capability & Trends Intel (Tanpa badge label di kanan)
+    # 2. Widget Darkweb Capability & Trends Intel
     st.markdown("""
     <div style="background: #060606; border: 1px solid #331111; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
         <div style="border-bottom: 1px solid #331111; padding-bottom: 10px; margin-bottom: 10px;">
@@ -603,7 +632,7 @@ with right_col:
             """
             st.markdown(trend_html, unsafe_allow_html=True)
 
-    # 3. Widget Live Darkweb & Ransomware Leaks (Tanpa badge label di kanan)
+    # 3. Widget Live Darkweb & Ransomware Leaks
     st.markdown("""
     <div style="background: #060606; border: 1px solid #2a1616; border-radius: 4px; padding: 15px;">
         <div style="border-bottom: 1px solid #2a1616; padding-bottom: 10px; margin-bottom: 10px;">

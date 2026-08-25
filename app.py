@@ -250,39 +250,6 @@ with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."
     news_items = fetch_live_news()
     darkweb_items = fetch_darkweb_leaks()
 
-# --- MODUL 1: CUSTOM WATCHLIST & KEYWORD ALERT ---
-st.markdown("""
-<div style="background: #060606; border: 1px solid #1a3630; border-radius: 4px; padding: 12px 15px; margin-bottom: 15px;">
-    <span style="font-family: 'Courier New', Courier, monospace; font-size: 12px; font-weight: bold; color: #00ffcc;">🔍 MODUL 1: TARGET WATCHLIST & KEYWORD ALERTS</span>
-</div>
-""", unsafe_allow_html=True)
-
-col_w1, col_w2 = st.columns([4, 1])
-with col_w1:
-    watchlist_input = st.text_input("Masukkan kata kunci pantauan (pisahkan dengan koma, misal: bank, microsoft, data, usa)", value=st.session_state.get("watchlist_query", ""))
-    st.session_state["watchlist_query"] = watchlist_input
-
-keywords = [k.strip().lower() for k in watchlist_input.split(",") if k.strip()]
-matched_alerts = []
-if keywords:
-    for item in news_items:
-        for kw in keywords:
-            if kw in item["title"].lower():
-                matched_alerts.append(f"NEWS MATCH [{kw.upper()}]: {item['title']} ({item['source']})")
-    for dw in darkweb_items:
-        for kw in keywords:
-            if kw in dw["target"].lower() or kw in dw["group"].lower():
-                matched_alerts.append(f"DARKWEB MATCH [{kw.upper()}]: Gang '{dw['group']}' menyerang '{dw['target']}'")
-
-if matched_alerts:
-    alerts_html = "".join([f"<div style='font-size: 11px; color: #ff3333; margin-bottom: 4px;'>⚠️ {alt}</div>" for alt in matched_alerts[:5]])
-    st.markdown(f"""
-    <div style="background: #1a0808; border: 1px solid #ff3333; border-left: 4px solid #ff3333; padding: 12px; border-radius: 4px; margin-bottom: 15px;">
-        <b style="color: #ff5555; font-size: 12px;">CRITICAL WATCHLIST ALERT DETECTED ({len(matched_alerts)} MATCHES):</b><br>
-        {alerts_html}
-    </div>
-    """, unsafe_allow_html=True)
-
 COUNTRY_COORDS = {
     "US": (37.0902, -95.7129), "GB": (55.3781, -3.4360), "CA": (56.1304, -106.3468),
     "FR": (46.2276, 2.2137), "DE": (51.1657, 10.4515), "BR": (-14.2350, -51.9253),

@@ -141,17 +141,35 @@ def fetch_live_news():
 
     articles_list = []
     error_reason = None
+    url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
+    response = None
+    # GDELT kadang lambat merespons -> coba lagi dengan timeout lebih longgar
+    # sebelum menyerah, daripada langsung fallback di percobaan pertama.
+    for timeout_s in (10, 20):
+        try:
+            response = requests.get(url, timeout=timeout_s)
+            error_reason = None
+            break
+        except requests.exceptions.Timeout:
+            error_reason = f"Timeout menghubungi GDELT (>{timeout_s} detik)"
+            continue
+        except requests.exceptions.ConnectionError as e:
+            error_reason = f"Gagal konek ke GDELT: {e}"
+            break
+        except Exception as e:
+            error_reason = f"Error tak terduga: {type(e).__name__}: {e}"
+            break
+
     try:
-        url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
-        response = requests.get(url, timeout=10)
-        if response.status_code != 200:
-            error_reason = f"GDELT balas HTTP {response.status_code}"
-        else:
-            try:
-                data = response.json()
-            except ValueError:
-                data = {}
-                error_reason = f"Respons GDELT bukan JSON valid (potongan: {response.text[:120]!r})"
+        if response is not None and error_reason is None:
+            data = {}
+            if response.status_code != 200:
+                error_reason = f"GDELT balas HTTP {response.status_code}"
+            else:
+                try:
+                    data = response.json()
+                except ValueError:
+                    error_reason = f"Respons GDELT bukan JSON valid (potongan: {response.text[:120]!r})"
 
             articles = data.get("articles", [])
             if not articles and not error_reason:
@@ -174,12 +192,8 @@ def fetch_live_news():
                     "lon": 0.0 + (hash(title_en) % 180) - 90,
                     "region": assigned_region
                 })
-    except requests.exceptions.Timeout:
-        error_reason = "Timeout menghubungi GDELT (>10 detik)"
-    except requests.exceptions.ConnectionError as e:
-        error_reason = f"Gagal konek ke GDELT: {e}"
     except Exception as e:
-        error_reason = f"Error tak terduga: {type(e).__name__}: {e}"
+        error_reason = error_reason or f"Error saat memproses artikel: {type(e).__name__}: {e}"
 
     if len(articles_list) >= 8:
         # Fetch sukses dengan hasil cukup banyak -> simpan sebagai data live, TTL 1 jam

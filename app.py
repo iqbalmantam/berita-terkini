@@ -5,6 +5,7 @@ from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 import json
 import streamlit.components.v1 as components
+import textwrap
 
 # Konfigurasi Halaman (Full Width)
 st.set_page_config(
@@ -24,7 +25,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Auto-Refresh setiap 1 Jam (3600 detik)
+# Auto-Refresh setiap 1 Jam
 st_autorefresh(interval=3600 * 1000, key="osint_refresher")
 
 # Translator
@@ -256,29 +257,29 @@ with left_col:
     for item in news_items:
         cards_html += f'<div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: \'Courier New\', Courier, monospace;">{item["source"]}</span><span style="font-size: 10px; color: #777; font-family: \'Courier New\', Courier, monospace;">{item["date"]}</span></div><a href="{item["url"]}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: \'Courier New\', Courier, monospace; display: block; line-height: 1.4;">{item["title"]}</a><div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">&nearr;</div></div>'
 
-    ticker_widget_html = f"""
-<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
-        <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span>
-        <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">{len(news_items)} ITEMS</span>
-    </div>
-    <div class="ticker-container" style="height: 520px; overflow: hidden; position: relative;">
-        <div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">
-            {cards_html}
-            {cards_html}
+    ticker_widget_html = textwrap.dedent(f"""
+    <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span>
+            <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">{len(news_items)} ITEMS</span>
+        </div>
+        <div class="ticker-container" style="height: 520px; overflow: hidden; position: relative;">
+            <div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">
+                {cards_html}
+                {cards_html}
+            </div>
         </div>
     </div>
-</div>
-<style>
-@keyframes autoScroll {{
-    0% {{ transform: translateY(0); }}
-    100% {{ transform: translateY(-50%); }}
-}}
-.ticker-container:hover .ticker-track {{
-    animation-play-state: paused;
-}}
-</style>
-"""
+    <style>
+    @keyframes autoScroll {{
+        0% {{ transform: translateY(0); }}
+        100% {{ transform: translateY(-50%); }}
+    }}
+    .ticker-container:hover .ticker-track {{
+        animation-play-state: paused;
+    }}
+    </style>
+    """)
     st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
 with right_col:
@@ -308,17 +309,17 @@ with right_col:
         </div>
         """
 
-    forex_widget_html = f"""
-<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
-        <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span>
-        <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span>
+    forex_widget_html = textwrap.dedent(f"""
+    <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span>
+            <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span>
+        </div>
+        <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
+            {forex_cards_html}
+        </div>
     </div>
-    <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
-        {forex_cards_html}
-    </div>
-</div>
-"""
+    """)
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
 # Footer & Watermark

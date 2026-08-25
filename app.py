@@ -34,7 +34,7 @@ def get_translator():
 
 translator = get_translator()
 
-# Fallback Data OSINT yang Diperkaya & Diperbanyak
+# Fallback Data OSINT yang Diperkaya
 DEFAULT_OSINT_DATA = [
     {"title": "Canada walked away from Trump. Could the EU ever do the same?", "url": "https://www.euronews.com", "source": "EURONEWS", "date": "2h ago", "lat": 50.8503, "lon": 4.3517, "region": "europe"},
     {"title": "Indonesians brave choking smoke to pray for rain as country battles wildfires", "url": "https://www.npr.org", "source": "NPR", "date": "2h ago", "lat": -0.7893, "lon": 113.9213, "region": "asia_pacific"},
@@ -45,16 +45,14 @@ DEFAULT_OSINT_DATA = [
     {"title": "Global supply chain pressures rise amid new maritime trade route restrictions", "url": "https://www.reuters.com", "source": "REUTERS", "date": "1h ago", "lat": 12.35, "lon": 43.23, "region": "middle_east"},
     {"title": "Central banks evaluate digital currency frameworks amid inflation shifts", "url": "https://www.bloomberg.com", "source": "BLOOMBERG", "date": "2h ago", "lat": 51.5074, "lon": -0.1278, "region": "europe"},
     {"title": "South China Sea naval exercises prompt diplomatic responses across ASEAN", "url": "https://www.channelnewsasia.com", "source": "CNA", "date": "3h ago", "lat": 12.0, "lon": 114.0, "region": "asia_pacific"},
-    {"title": "Latin American lithium corridor projects attract new multinational investments", "url": "https://www.mercopress.com", "source": "MERCOPRESS", "date": "4h ago", "lat": -22.9068, "lon": -43.1729, "region": "americas"},
-    {"title": "North African renewable energy grid integration enters phase two", "url": "https://www.africanews.com", "source": "AFRICA NEWS", "date": "5h ago", "lat": 30.0444, "lon": 31.2357, "region": "africa"},
-    {"title": "Pacific maritime surveillance pact upgraded with advanced drone tech", "url": "https://www.sbs.com.au", "source": "SBS", "date": "6h ago", "lat": -33.8688, "lon": 151.2093, "region": "asia_pacific"}
+    {"title": "Latin American lithium corridor projects attract new multinational investments", "url": "https://www.mercopress.com", "source": "MERCOPRESS", "date": "4h ago", "lat": -22.9068, "lon": -43.1729, "region": "americas"}
 ]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_live_news():
     articles_list = []
     try:
-        url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=35&format=json"
+        url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
@@ -80,7 +78,7 @@ def fetch_live_news():
                 })
     except Exception:
         pass
-    if len(articles_list) < 10:
+    if len(articles_list) < 8:
         return articles_list + DEFAULT_OSINT_DATA
     return articles_list
 
@@ -89,7 +87,7 @@ st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL EN
 
 news_items = fetch_live_news()
 
-# Inisialisasi Session State
+# Inisialisasi Session State Wilayah & Flat Mode
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "world"
 if "flat_mode" not in st.session_state:
@@ -126,16 +124,24 @@ with col7:
 
 current_region = st.session_state.selected_region
 
-viewpoints = {
-    "world": (0, 0, 2.5),
-    "americas": (20, -90, 1.6),
-    "europe": (50, 10, 1.4),
-    "middle_east": (25, 45, 1.4),
-    "asia_pacific": (10, 115, 1.6),
-    "africa": (0, 20, 1.6)
-}
-pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
-globe_json = json.dumps(news_items)
+# Filter berita jika bukan WORLD
+if current_region == "world":
+    filtered_news = news_items
+    pov_lat, pov_lng, pov_alt = 0, 0, 2.5
+else:
+    filtered_news = [item for item in news_items if item["region"] == current_region]
+    if not filtered_news:
+        filtered_news = news_items
+    viewpoints = {
+        "americas": (20, -90, 1.6),
+        "europe": (50, 10, 1.4),
+        "middle_east": (25, 45, 1.4),
+        "asia_pacific": (10, 115, 1.6),
+        "africa": (0, 20, 1.6)
+    }
+    pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
+
+globe_json = json.dumps(filtered_news)
 
 map_html = """
 <!DOCTYPE html>
@@ -297,43 +303,33 @@ map_html = (
 
 components.html(map_html, height=520)
 
-# Berita Berjalan (Live Ticker Running Bar ala Crucix)
+# Live News Ticker Box ala Crucix di Bawah Peta (Menampilkan SEMUA BERITA dalam wadah scrollable)
 st.markdown("---")
-st.markdown(f"#### 📡 LIVE NEWS TICKER & INTEL FEED (ALL REGIONS) — {len(news_items)} ITEMS")
 
-ticker_items_html = "".join([f"<span style='margin-right: 40px; color: #00ffcc;'>⚡ <b>[{item['region'].upper()}] {item['source']}</b>: <a href='{item['url']}' target='_blank' style='color: #fff; text-decoration: none;'>{item['title']}</a></span>" for item in news_items])
+ticker_cards_html = ""
+for item in news_items:
+    ticker_cards_html += f"""
+    <div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; transition: background 0.2s;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: 'Courier New', Courier, monospace; letter-spacing: 0.5px;">{item['source']}</span>
+            <span style="font-size: 10px; color: #777; font-family: 'Courier New', Courier, monospace;">{item['date']}</span>
+        </div>
+        <a href="{item['url']}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: 'Courier New', Courier, monospace; display: block; line-height: 1.4;">{item['title']}</a>
+        <div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">↗</div>
+    </div>
+    """
 
 st.markdown(f"""
-<div style="overflow: hidden; white-space: nowrap; background: #0a0a0a; border: 1px solid #00ffcc33; padding: 10px; margin-bottom: 20px; border-radius: 3px;">
-    <div style="display: inline-block; animation: ticker 40s linear infinite;">
-        {ticker_items_html}
+<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-top: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
+        <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; letter-spacing: 1px; color: #00ffcc;">LIVE NEWS TICKER</span>
+        <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace; font-weight: bold;">{len(news_items)} ITEMS</span>
+    </div>
+    <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
+        {ticker_cards_html}
     </div>
 </div>
-<style>
-@keyframes ticker {{
-    0% {{ transform: translate3d(0, 0, 0); }}
-    100% {{ transform: translate3d(-50%, 0, 0); }}
-}}
-div:hover > div[style*="animation"] {{
-    animation-play-state: paused;
-}}
-</style>
 """, unsafe_allow_html=True)
-
-# Grid Semua Berita Lengkap di Bawah Peta
-cols = st.columns(2)
-for idx, item in enumerate(news_items):
-    col_target = cols[idx % 2]
-    with col_target:
-        st.markdown(f"""
-        <div style="background: rgba(12, 12, 12, 0.9); border: 1px solid #1f1f1f; border-left: 2px solid #00ffcc; padding: 12px; margin-bottom: 12px; border-radius: 3px;">
-            <div style="font-size: 10px; color: #888; margin-bottom: 6px; display: flex; justify-content: space-between;">
-                <span><b>[{item['region'].upper()}] {item['source']}</b></span>
-                <span>{item['date']}</span>
-            </div>
-            <a href="{item['url']}" target="_blank" style="color: #fff; text-decoration: none; font-size: 12px; line-height: 1.4; display: block;">{item['title']}</a>
-        </div>
-        """, unsafe_allow_html=True)
 
 # Footer & Watermark
 st.markdown("---")

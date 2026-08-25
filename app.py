@@ -192,7 +192,7 @@ map_html = """
             .arcDashGap(0.2)
             .arcDashInitialGap(() => Math.random())
             .arcDashAnimateTime(2000)
-            .pointLabel(d => `<div class="globe-tooltip"><b>[\${d.region.toUpperCase()}]</b><br><a href="\${d.url}" target="_blank">\${d.title}</b><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: \${d.source} | \${d.date}</span></div>`);
+            .pointLabel(d => `<div class="globe-tooltip"><b>[\${d.region.toUpperCase()}]</b><br><a href="\${d.url}" target="_blank">\${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: \${d.source} | \${d.date}</span></div>`);
         const controls = world.controls();
         controls.autoRotate = !isFlat;
         controls.autoRotateSpeed = 0.7;
@@ -217,98 +217,90 @@ components.html(map_html, height=520)
 
 st.markdown("---")
 
-# Layout 2 Kolom: Kiri = Live News Ticker (Auto-Scroll), Kanan = Kurs Mata Uang terhadap Rupiah (IDR)
+# Layout 2 Kolom: Kiri = Live News Ticker (Auto-Scroll), Kanan = Kurs Rupiah terhadap Valuta Asing
 left_col, right_col = st.columns([1.3, 1])
 
 with left_col:
     cards_html = ""
     for item in news_items:
-        cards_html += f"""
-        <div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                <span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: 'Courier New', Courier, monospace;">{item['source']}</span>
-                <span style="font-size: 10px; color: #777; font-family: 'Courier New', Courier, monospace;">{item['date']}</span>
-            </div>
-            <a href="{item['url']}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: 'Courier New', Courier, monospace; display: block; line-height: 1.4;">{item['title']}</a>
-            <div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">↗</div>
-        </div>
-        """
+        cards_html += f'<div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: \'Courier New\', Courier, monospace;">{item["source"]}</span><span style="font-size: 10px; color: #777; font-family: \'Courier New\', Courier, monospace;">{item["date"]}</span></div><a href="{item["url"]}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: \'Courier New\', Courier, monospace; display: block; line-height: 1.4;">{item["title"]}</a><div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">↗</div></div>'
 
-    st.markdown(f"""
-    <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
-            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span>
-            <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">{len(news_items)} ITEMS</span>
-        </div>
-        <div class="ticker-container" style="height: 480px; overflow: hidden; position: relative;">
-            <div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">
-                {cards_html}
-                {cards_html}
-            </div>
+    ticker_widget_html = f"""
+<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
+        <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span>
+        <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">{len(news_items)} ITEMS</span>
+    </div>
+    <div class="ticker-container" style="height: 480px; overflow: hidden; position: relative;">
+        <div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">
+            {cards_html}
+            {cards_html}
         </div>
     </div>
-    <style>
-    @keyframes autoScroll {{
-        0% {{ transform: translateY(0); }}
-        100% {{ transform: translateY(-50%); }}
-    }}
-    .ticker-container:hover .ticker-track {{
-        animation-play-state: paused;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+</div>
+<style>
+@keyframes autoScroll {{
+    0% {{ transform: translateY(0); }}
+    100% {{ transform: translateY(-50%); }}
+}}
+.ticker-container:hover .ticker-track {{
+    animation-play-state: paused;
+}}
+</style>
+"""
+    st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
 with right_col:
-    st.markdown("#### 💱 KURS RUPIAH (IDR) TERHADAP VALUTA ASING")
-    st.markdown("""
-    <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
-        <div style="border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 15px; font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">
-            NILAI TUKAR MATA ASING / IDR
+    forex_widget_html = """
+<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
+    <div style="border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 15px; font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">
+        NILAI TUKAR MATA ASING / IDR
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-family: 'Courier New', Courier, monospace;">
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">USD / IDR</div>
+            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 16,250.00</div>
+            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.15%</div>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-family: 'Courier New', Courier, monospace;">
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">USD / IDR</div>
-                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 16,250.00</div>
-                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.15%</div>
-            </div>
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">SGD / IDR</div>
-                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 12,100.50</div>
-                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.08%</div>
-            </div>
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">EUR / IDR</div>
-                <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 17,620.00</div>
-                <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.05%</div>
-            </div>
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">GBP / IDR</div>
-                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 20,615.30</div>
-                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.21%</div>
-            </div>
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">JPY / IDR</div>
-                <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 104.50</div>
-                <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.18%</div>
-            </div>
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">AUD / IDR</div>
-                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 10,750.25</div>
-                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.12%</div>
-            </div>
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">MYR / IDR</div>
-                <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 3,650.00</div>
-                <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.05%</div>
-            </div>
-            <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-                <div style="font-size: 11px; color: #888;">CNY / IDR</div>
-                <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 2,280.10</div>
-                <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.03%</div>
-            </div>
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">SGD / IDR</div>
+            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 12,100.50</div>
+            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.08%</div>
+        </div>
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">EUR / IDR</div>
+            <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 17,620.00</div>
+            <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.05%</div>
+        </div>
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">GBP / IDR</div>
+            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 20,615.30</div>
+            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.21%</div>
+        </div>
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">JPY / IDR</div>
+            <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 104.50</div>
+            <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.18%</div>
+        </div>
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">AUD / IDR</div>
+            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 10,750.25</div>
+            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.12%</div>
+        </div>
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">MYR / IDR</div>
+            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 3,650.00</div>
+            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.05%</div>
+        </div>
+        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
+            <div style="font-size: 11px; color: #888;">CNY / IDR</div>
+            <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 2,280.10</div>
+            <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.03%</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+"""
+    st.markdown(forex_widget_html, unsafe_allow_html=True)
 
 # Footer & Watermark
 st.markdown("---")

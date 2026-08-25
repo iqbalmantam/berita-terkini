@@ -587,44 +587,19 @@ with left_col:
             st.markdown(trend_html, unsafe_allow_html=True)
 
 with right_col:
-    # 1. Modul 2: Threat Analytics DENGAN LINK TARGET LANGSUNG (Kanan Atas)
+    # 1. Modul 2: Threat Analytics DENGAN BARIS HTML TANPA INDENTASI MENCOLOK
     total_leaks = len(darkweb_items)
     unique_gangs = len(set(d.get("group", "Unknown") for d in darkweb_items))
     
-    # Generate list link target aktif langsung di dalam analitik
     active_links_html = ""
     for dw in darkweb_items[:3]:
-        active_links_html += f"""
-        <div style="font-size: 10px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: #ff6666;">• [{dw.get('group', 'Gang')}]</span>
-            <a href="{dw.get('url', '#')}" target="_blank" style="color: #00ffcc; text-decoration: none;">{dw.get('target', 'Target')[:22]}... &nearr;</a>
-        </div>
-        """
+        g_name = dw.get('group', 'Gang')
+        t_name = dw.get('target', 'Target')[:22]
+        t_url = dw.get('url', '#')
+        active_links_html += f'<div style="font-size:10px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#ff6666;">• [{g_name}]</span><a href="{t_url}" target="_blank" style="color:#00ffcc;text-decoration:none;">{t_name}... &nearr;</a></div>'
 
-    analytics_html = f"""
-    <div style="background: #080808; border: 1px solid #331111; border-radius: 4px; padding: 12px 15px; margin-bottom: 15px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; color: #ff5555; border-bottom: 1px solid #221111; padding-bottom: 6px; margin-bottom: 8px;">
-            <span>📊 MODUL 2: THREAT ANALYTICS</span>
-            <a href="https://www.ransomware.live" target="_blank" style="color: #00ffcc; text-decoration: none; font-size: 10px;">FEED SOURCE &nearr;</a>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
-            <span>Total Active Leaks (24h):</span>
-            <b style="color: #00ffcc;">{total_leaks} Targets</b>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 4px;">
-            <span>Active Threat Syndicates:</span>
-            <b style="color: #ff5555;">{unique_gangs} Groups</b>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bbb; margin-bottom: 8px;">
-            <span>Threat Level Status:</span>
-            <b style="color: #ffaa00;">HIGH / CRITICAL</b>
-        </div>
-        <div style="border-top: 1px dashed #221111; padding-top: 6px; margin-top: 6px;">
-            <span style="font-size: 10px; color: #888; font-weight: bold;">LATEST HIGHLIGHT LINKS:</span>
-            {active_links_html}
-        </div>
-    </div>
-    """
+    analytics_html = f"""<div style="background:#080808;border:1px solid #331111;border-radius:4px;padding:12px 15px;margin-bottom:15px;"><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:bold;color:#ff5555;border-bottom:1px solid #221111;padding-bottom:6px;margin-bottom:8px;"><span>📊 MODUL 2: THREAT ANALYTICS</span><a href="https://www.ransomware.live" target="_blank" style="color:#00ffcc;text-decoration:none;font-size:10px;">FEED SOURCE &nearr;</a></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:4px;"><span>Total Active Leaks (24h):</span><b style="color:#00ffcc;">{total_leaks} Targets</b></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:4px;"><span>Active Threat Syndicates:</span><b style="color:#ff5555;">{unique_gangs} Groups</b></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:8px;"><span>Threat Level Status:</span><b style="color:#ffaa00;">HIGH / CRITICAL</b></div><div style="border-top:1px dashed #221111;padding-top:6px;margin-top:6px;"><span style="font-size:10px;color:#888;font-weight:bold;">LATEST HIGHLIGHT LINKS:</span>{active_links_html}</div></div>"""
+    
     st.markdown(analytics_html, unsafe_allow_html=True)
 
     # 2. Kurs Valas Asing

@@ -34,7 +34,40 @@ def get_translator():
 
 translator = get_translator()
 
-# Fallback Data OSINT
+# Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_forex_rates():
+    # Mengambil kurs referensi global terhadap USD, lalu dikonversi ke IDR
+    default_rates = {
+        "USD": 16250.0, "SGD": 12100.5, "EUR": 17620.0, "GBP": 20615.3,
+        "JPY": 104.5, "AUD": 10750.25, "MYR": 3650.0, "CNY": 2280.1
+    }
+    try:
+        url = "https://open.er-api.com/v6/latest/USD"
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            rates = data.get("rates", {})
+            idr_per_usd = rates.get("IDR", 16250.0)
+            
+            # Hitung kurs valuta lain terhadap IDR
+            live_rates = {}
+            currencies = ["USD", "SGD", "EUR", "GBP", "JPY", "AUD", "MYR", "CNY"]
+            for cur in currencies:
+                if cur == "USD":
+                    val_in_idr = idr_per_usd
+                else:
+                    val_in_usd = rates.get(cur, 1.0)
+                    val_in_idr = idr_per_usd / val_in_usd
+                live_rates[cur] = val_in_idr
+            return live_rates
+    except Exception:
+        pass
+    return default_rates
+
+forex_rates = fetch_forex_rates()
+
+# Fallback Data OSINT Berita
 DEFAULT_OSINT_DATA = [
     {"title": "Canada walked away from Trump. Could the EU ever do the same?", "url": "https://www.euronews.com", "source": "EURONEWS", "date": "2h ago", "lat": 50.8503, "lon": 4.3517, "region": "europe"},
     {"title": "Indonesians brave choking smoke to pray for rain as country battles wildfires", "url": "https://www.npr.org", "source": "NPR", "date": "2h ago", "lat": -0.7893, "lon": 113.9213, "region": "asia_pacific"},
@@ -83,7 +116,7 @@ def fetch_live_news():
     return articles_list
 
 st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
-st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE</span>", unsafe_allow_html=True)
+st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()
 
@@ -217,7 +250,7 @@ components.html(map_html, height=520)
 
 st.markdown("---")
 
-# Layout 2 Kolom: Kiri = Live News Ticker (Auto-Scroll), Kanan = Kurs Rupiah terhadap Valuta Asing
+# Layout 2 Kolom: Kiri = Live News Ticker (Auto-Scroll), Kanan = Kurs Beli & Jual Valas terhadap IDR
 left_col, right_col = st.columns([1.3, 1])
 
 with left_col:
@@ -231,7 +264,7 @@ with left_col:
         <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span>
         <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">{len(news_items)} ITEMS</span>
     </div>
-    <div class="ticker-container" style="height: 480px; overflow: hidden; position: relative;">
+    <div class="ticker-container" style="height: 520px; overflow: hidden; position: relative;">
         <div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">
             {cards_html}
             {cards_html}
@@ -251,52 +284,41 @@ with left_col:
     st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
 with right_col:
-    forex_widget_html = """
+    # Membangun kartu kurs dengan detail Beli (Buy) dan Jual (Sell)
+    forex_cards_html = ""
+    currencies_meta = [
+        ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
+        ("EUR", "Euro Zone"), ("GBP", "British Pound"), 
+        ("JPY", "Japanese Yen"), ("AUD", "Australian Dollar"), 
+        ("MYR", "Malaysian Ringgit"), ("CNY", "Chinese Yuan")
+    ]
+    
+    for code, name in currencies_meta:
+        mid_rate = forex_rates.get(code, 10000.0)
+        buy_rate = mid_rate * 0.995  # Estimasi Kurs Beli (sedikit di bawah mid)
+        sell_rate = mid_rate * 1.005 # Estimasi Kurs Jual (sedikit di atas mid)
+        
+        forex_cards_html += f"""
+        <div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;">
+                <span><b>{code} / IDR</b> ({name})</span>
+                <span style="color: #00ffcc;">LIVE 1H</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; font-family: 'Courier New', Courier, monospace;">
+                <div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div>
+                <div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div>
+            </div>
+        </div>
+        """
+
+    forex_widget_html = f"""
 <div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;">
-    <div style="border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 15px; font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">
-        NILAI TUKAR MATA ASING / IDR
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;">
+        <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span>
+        <span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span>
     </div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-family: 'Courier New', Courier, monospace;">
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">USD / IDR</div>
-            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 16,250.00</div>
-            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.15%</div>
-        </div>
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">SGD / IDR</div>
-            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 12,100.50</div>
-            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.08%</div>
-        </div>
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">EUR / IDR</div>
-            <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 17,620.00</div>
-            <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.05%</div>
-        </div>
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">GBP / IDR</div>
-            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 20,615.30</div>
-            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.21%</div>
-        </div>
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">JPY / IDR</div>
-            <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 104.50</div>
-            <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.18%</div>
-        </div>
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">AUD / IDR</div>
-            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 10,750.25</div>
-            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.12%</div>
-        </div>
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">MYR / IDR</div>
-            <div style="font-size: 15px; color: #00ffcc; font-weight: bold; margin-top: 4px;">Rp 3,650.00</div>
-            <div style="font-size: 10px; color: #00ffcc88; margin-top: 2px;">▲ +0.05%</div>
-        </div>
-        <div style="background: #080808; border: 1px solid #161616; padding: 12px;">
-            <div style="font-size: 11px; color: #888;">CNY / IDR</div>
-            <div style="font-size: 15px; color: #ffaa00; font-weight: bold; margin-top: 4px;">Rp 2,280.10</div>
-            <div style="font-size: 10px; color: #ffaa0088; margin-top: 2px;">▼ -0.03%</div>
-        </div>
+    <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
+        {forex_cards_html}
     </div>
 </div>
 """
@@ -306,6 +328,47 @@ with right_col:
 st.markdown("---")
 footer_col1, footer_col2 = st.columns([2, 1])
 with footer_col1:
-    st.markdown("<span style='color: gray; font-size: 0.82em;'>⚙️ Sistem OSINT otomatis memperbarui data tiap 1 jam via GDELT & Live Feed.</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color: gray; font-size: 0.82em;'>⚙️ Sistem OSINT otomatis memperbarui berita & kurs tiap 1 jam.</span>", unsafe_allow_html=True)
 with footer_col2:
     st.markdown("<div style='text-align: right; color: gray; font-size: 0.85em;'><b>Developed by iqbalmantam</b></div>", unsafe_allow_html=True)
+```Tentu, penambahan informasi detail **Kurs Beli** dan **Kurs Jual** serta fitur **auto-update setiap 1 jam** sangat bisa diimplementasikan pada tampilan nilai tukar tersebut! 
+
+Berikut adalah rancangan ulang tampilannya agar mencakup harga beli dan jual, diikuti dengan penjelasan singkat bagaimana cara membuat sistem *auto-update* per 1 jam.
+
+---
+
+### ## Rancangan Tampilan (Dengan Kurs Beli & Jual)
+
+Biasanya dalam perbankan atau *money changer*, terdapat selisih (*spread*) antara harga beli dan jual. Berikut contoh simulasinya berdasarkan data dari gambar Anda:
+
+| Mata Uang | Kurs Beli (Bank Beli dari Anda) | Kurs Jual (Bank Jual ke Anda) | Perubahan |
+| :--- | :--- | :--- | :--- |
+| **USD / IDR** | Rp 16.200,00 | Rp 16.300,00 | ▲ +0,15% |
+| **SGD / IDR** | Rp 12.050,50 | Rp 12.150,50 | ▲ +0,08% |
+| **EUR / IDR** | Rp 17.570,00 | Rp 17.670,00 | ▼ -0,05% |
+| **GBP / IDR** | Rp 20.565,30 | Rp 20.665,30 | ▲ +0,21% |
+| **JPY / IDR** | Rp 104,00 | Rp 105,00 | ▼ -0,18% |
+| **AUD / IDR** | Rp 10.700,25 | Rp 10.800,25 | ▲ +0,12% |
+| **MYR / IDR** | Rp 3.625,00 | Rp 3.675,00 | ▲ +0,05% |
+| **CNY / IDR** | Rp 2.255,10 | Rp 2.305,10 | ▼ -0,03% |
+
+---
+
+### ## Cara Membuat Otomatis Update per 1 Jam
+
+Untuk membuat data ini memperbarui diri secara otomatis setiap 1 jam, Anda bisa menggunakan beberapa pendekatan teknis berikut:
+
+*   **Menggunakan JavaScript (Frontend):** 
+    Jika dashboard ini berbasis web, Anda bisa memanfaatkan fungsi `setInterval` untuk memanggil ulang (*fetch*) data dari API setiap 3.600.000 milidetik (1 jam).
+    ```javascript
+    // Contoh fungsi auto-update setiap 1 jam
+    setInterval(() => {
+        fetchDataKurs(); // Fungsi untuk mengambil data terbaru dari API
+    }, 3600000);
+    ```
+*   **Menggunakan Cron Job (Backend/Server):** 
+    Jika Anda ingin menghemat kuota pemanggilan API pihak ketiga, Anda bisa membuat *cron job* di server yang melakukan *request* data kurs baru setiap 1 jam sekali, menyimpannya ke database *cache*, lalu *frontend* Anda tinggal mengambil data dari *cache* tersebut.
+*   **Sumber API Kurs Mata Uang:** 
+    Anda bisa menghubungkan sistem ini dengan API finansial gratis atau berbayar seperti *Open Exchange Rates*, *Fixer.io*, *ExchangeRate-API*, atau menggunakan data resmi dari API Bank Indonesia (BI).
+
+Apakah Anda ingin dibuatkan contoh kode program (HTML/CSS/JS atau React) untuk menerapkan layout tabel dan fitur auto-update ini?

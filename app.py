@@ -235,7 +235,6 @@ def fetch_live_news():
     store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
     return fallback_data
 
-# Fungsi Robust untuk Mengambil Data Darkweb / Ransomware Leaks Beserta Link Aslinya
 def fetch_darkweb_leaks():
     store = _get_cache_store("darkweb_v3")
     now = time.time()
@@ -257,7 +256,6 @@ def fetch_darkweb_leaks():
                 parsed_data = []
                 for v in victims[:15]:
                     if isinstance(v, dict):
-                        # Ekstraksi field dengan mendeteksi berbagai variasi key dari API
                         group_name = v.get("group_name") or v.get("gang") or v.get("ransomware") or v.get("group") or "Unknown Gang"
                         target_name = v.get("post_title") or v.get("target") or v.get("title") or v.get("name") or v.get("victim") or "Target Confirmed"
                         country_code = v.get("country") or v.get("geolocation") or "INT"
@@ -532,7 +530,7 @@ with left_col:
     for item in news_items:
         cards_html += f'<div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: \'Courier New\', Courier, monospace;">{item["source"]}</span><span style="font-size: 10px; color: #777; font-family: \'Courier New\', Courier, monospace;">{item["date"]}</span></div><a href="{item["url"]}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: \'Courier New\', Courier, monospace; display: block; line-height: 1.4;">{item["title"]}</a><div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">&nearr;</div></div>'
 
-    ticker_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">{len(news_items)} ITEMS</span></div><div class="ticker-container" style="height: 520px; overflow: hidden; position: relative;"><div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">{cards_html}{cards_html}</div></div></div>"""
+    ticker_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">{len(news_items)} ITEMS</span></div><div class="ticker-container" style="height: 520px; overflow: hidden; position: relative;"><div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">{cards_html}{cards_html}</div></div></div>"""
     st.markdown(ticker_widget_html, unsafe_allow_html=True)
 
 with right_col:
@@ -552,15 +550,62 @@ with right_col:
         
         forex_cards_html += f'<div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;"><span><b>{code} / IDR</b> ({name})</span><span style="color: #00ffcc;">LIVE 1H</span></div><div style="display: flex; justify-content: space-between; font-size: 12px; font-family: \'Courier New\', Courier, monospace;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div></div></div>'
 
-    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
+    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 240px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
-    # 2. Widget Darkweb & Ransomware Leaks (Sekarang bisa diklik & dibuka beritanya)
+    # 2. Widget Baru: DARKWEB THREAT INTEL & CAPABILITY TRENDS (Kemajuan Kapabilitas Hacker)
+    st.markdown("""
+    <div style="background: #060606; border: 1px solid #331111; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #331111; padding-bottom: 10px; margin-bottom: 10px;">
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff5555;">🧬 DARKWEB CAPABILITY & TRENDS INTEL</span>
+            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">TRENDS</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    trends_container = st.container(height=240)
+    with trends_container:
+        trends_list = [
+            {
+                "topic": "AI-ENABLED ADVERSARIES",
+                "desc": "Lonjakan tajam penggunaan AI generatif oleh sindikat kriminal untuk otomatisasi serangan siber, rekayasa sosial, dan voice phishing interaktif.",
+                "level": "CRITICAL"
+            },
+            {
+                "topic": "INFOSTEALER SURGE (REDLINE & LUMMA)",
+                "desc": "Pasar gelap darkweb dibanjiri miliaran kredensial curian, token OAuth, dan session cookies langsung dari perangkat pengguna tanpa merusak sistem.",
+                "level": "HIGH"
+            },
+            {
+                "topic": "EVOLUSI RaaS & MULTI-EXTORTION",
+                "desc": "Sindikat Ransomware-as-a-Service (seperti RansomHub & Qilin) mengkombinasikan enkripsi data dengan ancaman pembocoran langsung di leak sites.",
+                "level": "HIGH"
+            },
+            {
+                "topic": "ZERO-DAY & EDGE EXPLOITATION",
+                "desc": "Jeda waktu eksploitasi celah keamanan menyusut ekstrem; hacker semakin mahir menargetkan perangkat VPN dan edge router sebelum patch resmi dirilis.",
+                "level": "CRITICAL"
+            }
+        ]
+        
+        for t in trends_list:
+            trend_html = f"""
+            <div style="background: #080808; border: 1px solid #2a1616; border-left: 3px solid #ff5555; padding: 10px 12px; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ff6666; border-bottom: 1px solid #1f1a1a; padding-bottom: 4px; margin-bottom: 6px;">
+                    <span><b>[TREND] {t["topic"]}</b></span>
+                    <span style="color: #ff3333; font-weight: bold;">{t["level"]}</span>
+                </div>
+                <div style="font-size: 11px; color: #ccc; line-height: 1.4;">{t["desc"]}</div>
+            </div>
+            """
+            st.markdown(trend_html, unsafe_allow_html=True)
+
+    # 3. Widget Live Darkweb & Ransomware Leaks (Clickable)
     st.markdown("""
     <div style="background: #060606; border: 1px solid #2a1616; border-radius: 4px; padding: 15px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a1616; padding-bottom: 10px; margin-bottom: 10px;">
             <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff3333;">⚠️ LIVE DARKWEB & RANSOM LEAKS</span>
-            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">API LIVE & CLICKABLE</span>
+            <span style="background: #2a0c0c; border: 1px solid #ff333355; color: #ff6666; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">API LIVE</span>
         </div>
     </div>
     """, unsafe_allow_html=True)

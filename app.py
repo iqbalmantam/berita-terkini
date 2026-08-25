@@ -4,15 +4,16 @@ import requests
 from deep_translator import GoogleTranslator
 from streamlit_autorefresh import st_autorefresh
 import json
+import streamlit.components.v1 as components
 
-# TTL cache: 1 jam kalau fetch terakhir SUKSES, 5 menit kalau terakhir GAGAL
+# TTL cache: 1 jam kalau fetch SUKSES, 15 menit kalau GAGAL (hindari limit API)
 LIVE_TTL = 3600
-RETRY_TTL = 300
+RETRY_TTL = 900
 
 @st.cache_resource
 def _get_cache_store(name: str):
     """Wadah state persisten lintas rerun & lintas user"""
-    return {"data": None, "timestamp": 0.0, "is_live": False}
+    return {"data": None, "timestamp": 0.0, "is_live": False, "source": "", "last_error": None}
 
 # Konfigurasi Halaman (Full Width)
 st.set_page_config(
@@ -109,114 +110,137 @@ def fetch_forex_rates():
 
 forex_rates = fetch_forex_rates()
 
-# Fallback Data OSINT Berita
-DEFAULT_OSINT_DATA = [
-    {"title": "Canada walked away from Trump. Could the EU ever do the same?", "url": "https://www.euronews.com", "source": "EURONEWS", "date": "2h ago", "lat": 50.8503, "lon": 4.3517, "region": "europe"},
-    {"title": "Indonesians brave choking smoke to pray for rain as country battles wildfires", "url": "https://www.npr.org", "source": "NPR", "date": "2h ago", "lat": -0.7893, "lon": 113.9213, "region": "asia_pacific"},
-    {"title": "Two US carrier groups in Middle East strain navy resources", "url": "https://www.aljazeera.com", "source": "AL JAZEERA", "date": "2h ago", "lat": 25.276987, "lon": 55.296249, "region": "middle_east"},
-    {"title": "The UK will help Ukraine make long-range missiles by sharing classified tech information", "url": "https://www.reuters.com", "source": "REUTERS", "date": "3h ago", "lat": 48.3794, "lon": 31.1656, "region": "europe"},
-    {"title": "New economic measures and tariffs impact trade across the Americas", "url": "https://www.bloomberg.com", "source": "BLOOMBERG", "date": "4h ago", "lat": 25.0343, "lon": -77.3963, "region": "americas"},
-    {"title": "Ceasefire verification mission deploys to eastern DR Congo", "url": "https://www.france24.com", "source": "FRANCE 24", "date": "5h ago", "lat": -4.0383, "lon": 21.7587, "region": "africa"},
-    {"title": "Global supply chain pressures rise amid new maritime trade route restrictions", "url": "https://www.reuters.com", "source": "REUTERS", "date": "1h ago", "lat": 12.35, "lon": 43.23, "region": "middle_east"},
-    {"title": "Central banks evaluate digital currency frameworks amid inflation shifts", "url": "https://www.bloomberg.com", "source": "BLOOMBERG", "date": "2h ago", "lat": 51.5074, "lon": -0.1278, "region": "europe"},
-    {"title": "South China Sea naval exercises prompt diplomatic responses across ASEAN", "url": "https://www.channelnewsasia.com", "source": "CNA", "date": "3h ago", "lat": 12.0, "lon": 114.0, "region": "asia_pacific"},
-    {"title": "Latin American lithium corridor projects attract new multinational investments", "url": "https://www.mercopress.com", "source": "MERCOPRESS", "date": "4h ago", "lat": -22.9068, "lon": -43.1729, "region": "americas"}
-]
-
+# Fungsi Berita 100% Online (TIDAK ADA DATA STATIS)
 def fetch_live_news():
     store = _get_cache_store("news")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
+    
     if store["data"] is not None and (now - store["timestamp"]) < ttl:
         return store["data"]
 
-    articles_list = []
-    error_reason = None
-    url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
-    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-    
-    response = None
-    for timeout_s in (10, 20):
-        try:
-            response = requests.get(url, headers=headers, timeout=timeout_s)
-            error_reason = None
-            break
-        except requests.exceptions.Timeout:
-            error_reason = f"Timeout menghubungi GDELT (>{timeout_s} detik)"
-            continue
-        except requests.exceptions.ConnectionError as e:
-            error_reason = f"Gagal konek ke GDELT: {e}"
-            break
-        except Exception as e:
-            error_reason = f"Error tak terduga: {type(e).__name__}: {e}"
-            break
+    regions_pool = ["world", "americas", "europe", "middle_east", "asia_pacific", "africa"]
+    error_logs = []
 
+    # --- PERCOBAAN 1: GDELT API ---
+    articles_list = []
+    url_gdelt = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
     try:
-        if response is not None and error_reason is None:
-            data = {}
-            if response.status_code != 200:
-                error_reason = f"GDELT balas HTTP {response.status_code}"
-            else:
-                try:
-                    data = response.json()
-                except ValueError:
-                    error_reason = "Respons GDELT bukan JSON valid"
-
-            articles = data.get("articles", [])
-            if not articles and not error_reason:
-                error_reason = "GDELT mengembalikan 0 artikel untuk query ini"
-
-            regions_pool = ["world", "americas", "europe", "middle_east", "asia_pacific", "africa"]
-            for idx, art in enumerate(articles):
+        res_gdelt = requests.get(url_gdelt, headers=headers, timeout=10)
+        if res_gdelt.status_code == 200:
+            data = res_gdelt.json()
+            for idx, art in enumerate(data.get("articles", [])):
                 title_en = art.get("title", "")
-                if not title_en:
-                    continue
-                try:
-                    title_id = translate_title(title_en)
-                except Exception:
-                    title_id = title_en
-
+                if not title_en: continue
+                try: title_id = translate_title(title_en)
+                except: title_id = title_en
                 time.sleep(0.1)
                 assigned_region = regions_pool[idx % len(regions_pool)]
                 articles_list.append({
-                    "title": title_id,
-                    "url": art.get("url", "#"),
-                    "source": art.get("source", "OSINT FEED").upper(),
-                    "date": "1h ago",
-                    "lat": 20.0 + (hash(title_en) % 30) - 15,
-                    "lon": 0.0 + (hash(title_en) % 180) - 90,
+                    "title": title_id, "url": art.get("url", "#"),
+                    "source": art.get("source", "GDELT").upper(), "date": "1h ago",
+                    "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
                     "region": assigned_region
                 })
+        else:
+            error_logs.append(f"GDELT HTTP {res_gdelt.status_code}")
     except Exception as e:
-        error_reason = error_reason or f"Error saat memproses artikel: {type(e).__name__}: {e}"
+        error_logs.append(f"GDELT Error: {type(e).__name__}")
 
     if len(articles_list) >= 5:
-        store["data"] = articles_list
-        store["timestamp"] = now
-        store["is_live"] = True
-        store["last_error"] = None
+        store.update({"data": articles_list, "timestamp": now, "is_live": True, "source": "GDELT", "last_error": None})
         return articles_list
 
-    store["last_error"] = error_reason or f"Cuma {len(articles_list)} artikel valid (minimal butuh 5)"
-    fallback = store["data"] if store["data"] is not None else (articles_list + DEFAULT_OSINT_DATA)
-    store["data"] = fallback
-    store["timestamp"] = now
-    store["is_live"] = False
-    return fallback
+    # --- PERCOBAAN 2: BBC WORLD NEWS (BACKUP 1) ---
+    bbc_list = []
+    url_bbc = "https://api.rss2json.com/v1/api.json?rss_url=http://feeds.bbci.co.uk/news/world/rss.xml"
+    try:
+        res_bbc = requests.get(url_bbc, headers=headers, timeout=10)
+        if res_bbc.status_code == 200:
+            b_data = res_bbc.json()
+            for idx, item in enumerate(b_data.get("items", [])[:15]):
+                title_en = item.get("title", "")
+                if not title_en: continue
+                try: title_id = translate_title(title_en)
+                except: title_id = title_en
+                time.sleep(0.1)
+                assigned_region = regions_pool[idx % len(regions_pool)]
+                bbc_list.append({
+                    "title": title_id, "url": item.get("link", "#"),
+                    "source": "BBC NEWS", "date": "LIVE BACKUP",
+                    "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
+                    "region": assigned_region
+                })
+        else:
+            error_logs.append(f"BBC HTTP {res_bbc.status_code}")
+    except Exception as e:
+        error_logs.append(f"BBC Error: {type(e).__name__}")
+
+    if len(bbc_list) >= 5:
+        store.update({"data": bbc_list, "timestamp": now, "is_live": True, "source": "BBC", "last_error": " | ".join(error_logs)})
+        return bbc_list
+
+    # --- PERCOBAAN 3: AL JAZEERA (BACKUP 2) ---
+    alj_list = []
+    url_alj = "https://api.rss2json.com/v1/api.json?rss_url=https://www.aljazeera.com/xml/rss/all.xml"
+    try:
+        res_alj = requests.get(url_alj, headers=headers, timeout=10)
+        if res_alj.status_code == 200:
+            a_data = res_alj.json()
+            for idx, item in enumerate(a_data.get("items", [])[:15]):
+                title_en = item.get("title", "")
+                if not title_en: continue
+                try: title_id = translate_title(title_en)
+                except: title_id = title_en
+                time.sleep(0.1)
+                assigned_region = regions_pool[idx % len(regions_pool)]
+                alj_list.append({
+                    "title": title_id, "url": item.get("link", "#"),
+                    "source": "AL JAZEERA", "date": "LIVE BACKUP",
+                    "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
+                    "region": assigned_region
+                })
+        else:
+            error_logs.append(f"ALJ HTTP {res_alj.status_code}")
+    except Exception as e:
+        error_logs.append(f"ALJ Error: {type(e).__name__}")
+
+    if len(alj_list) >= 5:
+        store.update({"data": alj_list, "timestamp": now, "is_live": True, "source": "AL JAZEERA", "last_error": " | ".join(error_logs)})
+        return alj_list
+
+    # --- JIKA KONEKSI INTERNET BENAR-BENAR TERPUTUS (TIDAK ADA DATA STATIS) ---
+    # Memunculkan satu item notifikasi error agar UI terminal tidak crash
+    error_item = [{
+        "title": "KONEKSI TERPUTUS. GAGAL MENGAMBIL SELURUH SUMBER BERITA ONLINE.", 
+        "url": "#", "source": "SYSTEM ALERT", "date": "NOW",
+        "lat": 0.0, "lon": 0.0, "region": "world"
+    }]
+    
+    fallback_data = store["data"] if store["data"] is not None else error_item
+    store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "Semua API Online Gagal"})
+    return fallback_data
 
 st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()
 _news_status = _get_cache_store("news")
+
+# Indikator Status Terminal
 if _news_status.get("is_live"):
-    st.markdown("<span style='color:#00ffcc; font-size:0.78em;'>● LIVE — data GDELT berhasil diambil</span>", unsafe_allow_html=True)
+    src = _news_status.get("source", "")
+    if src == "GDELT":
+        st.markdown("<span style='color:#00ffcc; font-size:0.78em;'>● LIVE ENGINE: GDELT PRIMARY — Connected</span>", unsafe_allow_html=True)
+    elif src in ["BBC", "AL JAZEERA"]:
+        err = _news_status.get("last_error", "")
+        st.markdown(f"<span style='color:#00ffcc; font-size:0.78em;'>● LIVE ENGINE: {src} BACKUP ACTIVE — (Primary Down: {err})</span>", unsafe_allow_html=True)
 else:
-    _reason = _news_status.get("last_error", "alasan tidak diketahui")
-    st.markdown(f"<span style='color:#ffaa00; font-size:0.78em;'>● FALLBACK — {_reason}</span>", unsafe_allow_html=True)
+    _reason = _news_status.get("last_error", "Tidak diketahui")
+    st.markdown(f"<span style='color:#ffaa00; font-size:0.78em;'>● OFFLINE MODE: KONEKSI TERPUTUS — ({_reason})</span>", unsafe_allow_html=True)
 
 # Inisialisasi Session State
 if "selected_region" not in st.session_state:
@@ -430,7 +454,7 @@ map_html = (
     .replace("__FLAT_MODE__", "true" if st.session_state.flat_mode else "false")
 )
 
-st.iframe(map_html, height=520)
+components.html(map_html, height=520)
 
 st.markdown("---")
 

@@ -34,70 +34,28 @@ def get_translator():
 
 translator = get_translator()
 
-# Fallback Data OSINT
+# Fallback Data OSINT yang Diperkaya & Diperbanyak
 DEFAULT_OSINT_DATA = [
-    {
-        "title": "Canada walked away from Trump. Could the EU ever do the same?",
-        "url": "https://www.euronews.com",
-        "source": "EURONEWS",
-        "date": "2h ago",
-        "lat": 50.8503,
-        "lon": 4.3517,
-        "region": "europe"
-    },
-    {
-        "title": "Indonesians brave choking smoke to pray for rain as country battles wildfires",
-        "url": "https://www.npr.org",
-        "source": "NPR",
-        "date": "2h ago",
-        "lat": -0.7893,
-        "lon": 113.9213,
-        "region": "asia_pacific"
-    },
-    {
-        "title": "Two US carrier groups in Middle East strain navy resources",
-        "url": "https://www.aljazeera.com",
-        "source": "AL JAZEERA",
-        "date": "2h ago",
-        "lat": 25.276987,
-        "lon": 55.296249,
-        "region": "middle_east"
-    },
-    {
-        "title": "The UK will help Ukraine make long-range missiles by sharing classified tech information",
-        "url": "https://www.reuters.com",
-        "source": "REUTERS",
-        "date": "3h ago",
-        "lat": 48.3794,
-        "lon": 31.1656,
-        "region": "europe"
-    },
-    {
-        "title": "New economic measures and tariffs impact trade across the Americas",
-        "url": "https://www.bloomberg.com",
-        "source": "BLOOMBERG",
-        "date": "4h ago",
-        "lat": 25.0343,
-        "lon": -77.3963,
-        "region": "americas"
-    },
-    {
-        "title": "Ceasefire verification mission deploys to eastern DR Congo",
-        "url": "https://www.france24.com",
-        "source": "FRANCE 24",
-        "date": "5h ago",
-        "lat": -4.0383,
-        "lon": 21.7587,
-        "region": "africa"
-    }
+    {"title": "Canada walked away from Trump. Could the EU ever do the same?", "url": "https://www.euronews.com", "source": "EURONEWS", "date": "2h ago", "lat": 50.8503, "lon": 4.3517, "region": "europe"},
+    {"title": "Indonesians brave choking smoke to pray for rain as country battles wildfires", "url": "https://www.npr.org", "source": "NPR", "date": "2h ago", "lat": -0.7893, "lon": 113.9213, "region": "asia_pacific"},
+    {"title": "Two US carrier groups in Middle East strain navy resources", "url": "https://www.aljazeera.com", "source": "AL JAZEERA", "date": "2h ago", "lat": 25.276987, "lon": 55.296249, "region": "middle_east"},
+    {"title": "The UK will help Ukraine make long-range missiles by sharing classified tech information", "url": "https://www.reuters.com", "source": "REUTERS", "date": "3h ago", "lat": 48.3794, "lon": 31.1656, "region": "europe"},
+    {"title": "New economic measures and tariffs impact trade across the Americas", "url": "https://www.bloomberg.com", "source": "BLOOMBERG", "date": "4h ago", "lat": 25.0343, "lon": -77.3963, "region": "americas"},
+    {"title": "Ceasefire verification mission deploys to eastern DR Congo", "url": "https://www.france24.com", "source": "FRANCE 24", "date": "5h ago", "lat": -4.0383, "lon": 21.7587, "region": "africa"},
+    {"title": "Global supply chain pressures rise amid new maritime trade route restrictions", "url": "https://www.reuters.com", "source": "REUTERS", "date": "1h ago", "lat": 12.35, "lon": 43.23, "region": "middle_east"},
+    {"title": "Central banks evaluate digital currency frameworks amid inflation shifts", "url": "https://www.bloomberg.com", "source": "BLOOMBERG", "date": "2h ago", "lat": 51.5074, "lon": -0.1278, "region": "europe"},
+    {"title": "South China Sea naval exercises prompt diplomatic responses across ASEAN", "url": "https://www.channelnewsasia.com", "source": "CNA", "date": "3h ago", "lat": 12.0, "lon": 114.0, "region": "asia_pacific"},
+    {"title": "Latin American lithium corridor projects attract new multinational investments", "url": "https://www.mercopress.com", "source": "MERCOPRESS", "date": "4h ago", "lat": -22.9068, "lon": -43.1729, "region": "americas"},
+    {"title": "North African renewable energy grid integration enters phase two", "url": "https://www.africanews.com", "source": "AFRICA NEWS", "date": "5h ago", "lat": 30.0444, "lon": 31.2357, "region": "africa"},
+    {"title": "Pacific maritime surveillance pact upgraded with advanced drone tech", "url": "https://www.sbs.com.au", "source": "SBS", "date": "6h ago", "lat": -33.8688, "lon": 151.2093, "region": "asia_pacific"}
 ]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_live_news():
     articles_list = []
     try:
-        url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy&mode=artlist&maxrecords=15&format=json"
-        response = requests.get(url, timeout=8)
+        url = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=35&format=json"
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
             articles = data.get("articles", [])
@@ -122,16 +80,16 @@ def fetch_live_news():
                 })
     except Exception:
         pass
-    if not articles_list:
-        return DEFAULT_OSINT_DATA
-    return articles_list + DEFAULT_OSINT_DATA
+    if len(articles_list) < 10:
+        return articles_list + DEFAULT_OSINT_DATA
+    return articles_list
 
 st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()
 
-# Inisialisasi Session State Wilayah & Flat Mode
+# Inisialisasi Session State
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "world"
 if "flat_mode" not in st.session_state:
@@ -139,7 +97,7 @@ if "flat_mode" not in st.session_state:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Menu Navigasi Wilayah & Tombol Flat Mode di Atas Peta (7 Kolom)
+# Menu Navigasi Wilayah & Flat Mode (7 Kolom)
 col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
 
 with col1:
@@ -168,7 +126,6 @@ with col7:
 
 current_region = st.session_state.selected_region
 
-# Tentukan koordinat fokus (POV) berdasarkan tombol wilayah yang diklik
 viewpoints = {
     "world": (0, 0, 2.5),
     "americas": (20, -90, 1.6),
@@ -178,10 +135,8 @@ viewpoints = {
     "africa": (0, 20, 1.6)
 }
 pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
-
 globe_json = json.dumps(news_items)
 
-# HTML Peta 3D dengan Tombol Zoom (+/-) di dalam peta
 map_html = """
 <!DOCTYPE html>
 <html>
@@ -342,10 +297,30 @@ map_html = (
 
 components.html(map_html, height=520)
 
-# Live News Ticker & Feed di Bawah Peta (Menampilkan SEMUA BERITA seperti Crucix)
+# Berita Berjalan (Live Ticker Running Bar ala Crucix)
 st.markdown("---")
 st.markdown(f"#### 📡 LIVE NEWS TICKER & INTEL FEED (ALL REGIONS) — {len(news_items)} ITEMS")
 
+ticker_items_html = "".join([f"<span style='margin-right: 40px; color: #00ffcc;'>⚡ <b>[{item['region'].upper()}] {item['source']}</b>: <a href='{item['url']}' target='_blank' style='color: #fff; text-decoration: none;'>{item['title']}</a></span>" for item in news_items])
+
+st.markdown(f"""
+<div style="overflow: hidden; white-space: nowrap; background: #0a0a0a; border: 1px solid #00ffcc33; padding: 10px; margin-bottom: 20px; border-radius: 3px;">
+    <div style="display: inline-block; animation: ticker 40s linear infinite;">
+        {ticker_items_html}
+    </div>
+</div>
+<style>
+@keyframes ticker {{
+    0% {{ transform: translate3d(0, 0, 0); }}
+    100% {{ transform: translate3d(-50%, 0, 0); }}
+}}
+div:hover > div[style*="animation"] {{
+    animation-play-state: paused;
+}}
+</style>
+""", unsafe_allow_html=True)
+
+# Grid Semua Berita Lengkap di Bawah Peta
 cols = st.columns(2)
 for idx, item in enumerate(news_items):
     col_target = cols[idx % 2]

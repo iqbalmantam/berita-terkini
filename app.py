@@ -258,7 +258,6 @@ viewpoints = {
 pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
 globe_json = json.dumps(news_items)
 
-# Menerima interaksi klik tombol dari JavaScript di dalam iframe via query params atau callback sederhana
 query_params = st.query_params
 if "region" in query_params:
     reg = query_params["region"]
@@ -275,14 +274,12 @@ map_html = f"""
         body {{ margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }}
         #map-container {{ width: 100%; height: 520px; position: relative; }}
         
-        /* Kontrol Kiri Atas ala Crucix.live */
         .crucix-top-left {{ position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 6px; }}
         .ctrl-row {{ display: flex; gap: 4px; align-items: center; }}
         .crucix-btn {{ background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; text-decoration: none; }}
         .crucix-btn:hover, .crucix-btn.active {{ border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }}
         .mode-btn {{ width: auto; padding: 0 12px; font-size: 11px; letter-spacing: 1px; }}
 
-        /* Menu Wilayah Kiri Bawah ala Crucix.live */
         .crucix-bottom-left {{ position: absolute; bottom: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; background: rgba(5,5,5,0.85); border: 1px solid #00ffcc33; padding: 8px; backdrop-filter: blur(4px); }}
         .region-btn {{ background: #050505; border: 1px solid #00ffcc44; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 6px 10px; cursor: pointer; text-align: left; text-decoration: none; display: block; }}
         .region-btn:hover, .region-btn.active {{ border-color: #00ffcc; background: #00ffcc33; color: #fff; }}
@@ -298,7 +295,6 @@ map_html = f"""
 </head>
 <body>
     <div id="map-container">
-        <!-- KONTROL KIRI ATAS: ZOOM & MODE -->
         <div class="crucix-top-left">
             <div class="ctrl-row">
                 <button class="crucix-btn" onclick="zoomIn()">+</button>
@@ -307,7 +303,6 @@ map_html = f"""
             <div class="ctrl-row"><button class="crucix-btn" onclick="zoomOut()">-</button></div>
         </div>
 
-        <!-- KONTROL KIRI BAWAH: NAVIGASI WILAYAH -->
         <div class="crucix-bottom-left">
             <div style="font-size: 9px; color: #888; margin-bottom: 4px; letter-spacing: 1px;">REGIONAL SECTOR</div>
             <a class="region-btn {'active' if current_region=='world' else ''}" href="?region=world&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌐 WORLD</a>
@@ -340,7 +335,6 @@ map_html = f"""
             window.parent.location.href = url.toString();
         }}
 
-        // MODE 1: GLOBE 3D
         function buildGlobe() {{
             const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
@@ -377,7 +371,6 @@ map_html = f"""
             window.zoomOut = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }}, 500); }};
         }
 
-        // MODE 2: PETA DATAR 2D DENGAN GARIS PENGHUBUNG (ARCS)
         function buildFlatMap() {{
             const width = container.clientWidth || 900;
             const height = 520;
@@ -419,13 +412,11 @@ map_html = f"""
             function drawPointsAndArcs() {{
                 const arcsG = contentLayer.append('g');
                 
-                // Menerapkan Garis Penghubung Lengkung (Arcs) ala Crucix.live
                 arcsData.forEach(a => {{
                     const p1 = projection([a.startLng, a.startLat]);
                     const p2 = projection([a.endLng, a.endLat]);
                     if (!p1 || !p2) return;
                     
-                    // Membuat kurva lengkung di atas (quadratic bezier curve)
                     const mx = (p1[0] + p2[0]) / 2;
                     const my = (p1[1] + p2[1]) / 2 - 50; 
                     
@@ -464,7 +455,7 @@ map_html = f"""
             svg.call(zoom);
             window.zoomIn = () => svg.transition().duration(300).call(zoom.scaleBy, 1.5);
             window.zoomOut = () => svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
-        }}
+        }
 
         if (isFlat) {{ buildFlatMap(); }} else {{ buildGlobe(); }}
     </script>
@@ -476,7 +467,6 @@ components.html(map_html, height=540)
 
 st.markdown("---")
 
-# Layout 2 Kolom: Kiri = Live News Ticker, Kanan = Kurs Valas
 left_col, right_col = st.columns([1.3, 1])
 
 with left_col:
@@ -506,7 +496,6 @@ with right_col:
     forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
-# Footer & Watermark
 st.markdown("---")
 footer_col1, footer_col2 = st.columns([2, 1])
 with footer_col1:

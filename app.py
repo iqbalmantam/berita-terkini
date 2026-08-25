@@ -287,7 +287,6 @@ with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."
     news_items = fetch_live_news()
     darkweb_items = fetch_darkweb_leaks()
 
-# Mapping Koordinat Negara untuk Data Darkweb
 COUNTRY_COORDS = {
     "US": (37.0902, -95.7129), "GB": (55.3781, -3.4360), "CA": (56.1304, -106.3468),
     "FR": (46.2276, 2.2137), "DE": (51.1657, 10.4515), "BR": (-14.2350, -51.9253),
@@ -296,7 +295,6 @@ COUNTRY_COORDS = {
     "AR": (-38.4161, -63.6167), "AE": (23.4241, 53.8478), "INT": (0.0, 0.0), "EU": (50.8503, 4.3517)
 }
 
-# Gabungkan Darkweb Leaks ke dalam Data Peta Globe/Map
 darkweb_map_items = []
 for d in darkweb_items:
     cc = d.get("country", "INT")
@@ -453,9 +451,14 @@ map_html = """
 
             const zoomLayer = svg.append('g');
 
+            const isWorld = (povLat === 0 && povLng === 0);
+            const scaleFactor = isWorld ? 1.0 : 2.5;
+
             const projection = d3.geoEquirectangular()
-                .rotate([-povLng, 0])
-                .fitSize([width, height], { type: 'Sphere' });
+                .rotate([-povLng, -povLat])
+                .scale((width / 6.28) * scaleFactor)
+                .translate([width / 2, height / 2]);
+
             const geoPath = d3.geoPath(projection);
 
             zoomLayer.append('path')
@@ -506,8 +509,14 @@ map_html = """
                     .style('opacity', 0).style('z-index', 100).style('transition', 'opacity 0.15s');
 
                 contentLayer.append('g').selectAll('circle').data(data).join('circle')
-                    .attr('cx', d => projection([d.lon, d.lat])[0])
-                    .attr('cy', d => projection([d.lon, d.lat])[1])
+                    .attr('cx', d => {
+                        const coords = projection([d.lon, d.lat]);
+                        return coords ? coords[0] : -9999;
+                    })
+                    .attr('cy', d => {
+                        const coords = projection([d.lon, d.lat]);
+                        return coords ? coords[1] : -9999;
+                    })
                     .attr('r', d => d.type === 'darkweb' ? 6 : 5)
                     .attr('fill', d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
                     .attr('stroke', d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')

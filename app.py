@@ -279,7 +279,6 @@ viewpoints = {
 pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
 globe_json = json.dumps(news_items)
 
-# Menentukan instruksi zoom untuk JavaScript
 zoom_cmd = ""
 if "zoom_action" in st.session_state:
     action = st.session_state.pop("zoom_action")
@@ -288,16 +287,17 @@ if "zoom_action" in st.session_state:
     elif action == "out":
         zoom_cmd = "window.zoomOut && window.zoomOut();"
 
-map_html = f"""
+# Menggunakan String Biasa agar kurung kurawal JS tidak memicu error f-string
+map_html = """
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-        body {{ margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }}
-        #map-container {{ width: 100%; height: 500px; position: relative; border: 1px solid #1a2b27; background: #050505; }}
-        .globe-tooltip {{ background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }}
-        .globe-tooltip a {{ color: #00ffcc; text-decoration: none; font-weight: bold; }}
-        .globe-tooltip a:hover {{ text-decoration: underline; }}
+        body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
+        #map-container { width: 100%; height: 500px; position: relative; border: 1px solid #1a2b27; background: #050505; }
+        .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
+        .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
+        .globe-tooltip a:hover { text-decoration: underline; }
     </style>
     <script src="https://unpkg.com/three"></script>
     <script src="https://unpkg.com/globe.gl"></script>
@@ -308,19 +308,19 @@ map_html = f"""
     <div id="map-container"></div>
 
     <script>
-        const data = {globe_json};
-        const isFlat = {"true" if st.session_state.flat_mode else "false"};
-        const povLat = {pov_lat}, povLng = {pov_lng}, povAlt = {pov_alt};
+        const data = __GLOBE_DATA_JSON__;
+        const isFlat = __IS_FLAT_BOOL__;
+        const povLat = __POV_LAT__, povLng = __POV_LNG__, povAlt = __POV_ALT__;
         const container = document.getElementById('map-container');
         
-        const arcsData = data.map((d, i) => {{
+        const arcsData = data.map((d, i) => {
             const target = data[(i + 2) % data.length];
-            return {{ startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] }};
-        }});
+            return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
+        });
         
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${{d.region.toUpperCase()}}]</b><br><a href="${{d.url}}" target="_blank">${{d.title}}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${{d.source}} | ${{d.date}}</span></div>`;
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.region.toUpperCase()}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${d.source} | ${d.date}</span></div>`;
 
-        function buildGlobe() {{
+        function buildGlobe() {
             const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
                 (container)
@@ -350,15 +350,15 @@ map_html = f"""
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.7;
             controls.enableZoom = true;
-            world.pointOfView({{ lat: povLat, lng: povLng, altitude: povAlt }}, 1000);
+            world.pointOfView({ lat: povLat, lng: povLng, altitude: povAlt }, 1000);
             
-            window.zoomIn = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }}, 500); }};
-            window.zoomOut = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }}, 500); }};
+            window.zoomIn = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500); };
+            window.zoomOut = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); };
             
-            {zoom_cmd}
-        }}
+            __ZOOM_CMD__
+        }
 
-        function buildFlatMap() {{
+        function buildFlatMap() {
             const width = container.clientWidth || 900;
             const height = 500;
 
@@ -370,11 +370,11 @@ map_html = f"""
 
             const projection = d3.geoEquirectangular()
                 .rotate([-povLng, 0])
-                .fitSize([width, height], {{ type: 'Sphere' }});
+                .fitSize([width, height], { type: 'Sphere' });
             const geoPath = d3.geoPath(projection);
 
             zoomLayer.append('path')
-                .datum({{ type: 'Sphere' }})
+                .datum({ type: 'Sphere' })
                 .attr('d', geoPath)
                 .attr('fill', '#060c0b').attr('stroke', '#1a3630').attr('stroke-width', 1);
 
@@ -387,19 +387,19 @@ map_html = f"""
             const contentLayer = zoomLayer.append('g');
 
             d3.json('https://unpkg.com/world-atlas@2/countries-110m.json')
-                .then(topo => {{
+                .then(topo => {
                     const countries = topojson.feature(topo, topo.objects.countries);
                     countryLayer.selectAll('path').data(countries.features).join('path')
                         .attr('d', geoPath)
                         .attr('fill', '#0a1a16').attr('stroke', '#00ffcc44').attr('stroke-width', 0.6);
-                }})
-                .catch(() => {{}})
+                })
+                .catch(() => {})
                 .finally(() => drawPointsAndArcs());
 
-            function drawPointsAndArcs() {{
+            function drawPointsAndArcs() {
                 const arcsG = contentLayer.append('g');
                 
-                arcsData.forEach(a => {{
+                arcsData.forEach(a => {
                     const p1 = projection([a.startLng, a.startLat]);
                     const p2 = projection([a.endLng, a.endLat]);
                     if (!p1 || !p2) return;
@@ -408,13 +408,13 @@ map_html = f"""
                     const my = (p1[1] + p2[1]) / 2 - 50; 
                     
                     arcsG.append('path')
-                        .attr('d', `M${{p1[0]}},${{p1[1]}} Q${{mx}},${{my}} ${{p2[0]}},${{p2[1]}}`)
+                        .attr('d', `M${p1[0]},${p1[1]} Q${mx},${my} ${p2[0]},${p2[1]}`)
                         .attr('fill', 'none')
                         .attr('stroke', '#00ffcc')
                         .attr('stroke-opacity', 0.35)
                         .attr('stroke-width', 1.2)
                         .attr('stroke-dasharray', '4,3');
-                }});
+                });
 
                 const tooltip = d3.select(container).append('div')
                     .style('position', 'absolute').style('pointer-events', 'none')
@@ -426,31 +426,41 @@ map_html = f"""
                     .attr('r', 5).attr('fill', '#00ffcc')
                     .attr('stroke', '#00ffcc').attr('stroke-width', 7).attr('stroke-opacity', 0.2)
                     .style('cursor', 'pointer')
-                    .on('mouseenter', function (event, d) {{
+                    .on('mouseenter', function (event, d) {
                         tooltip.style('opacity', 1).html(tooltipHtml(d));
-                    }})
-                    .on('mousemove', function (event) {{
+                    })
+                    .on('mousemove', function (event) {
                         const [mx, my] = d3.pointer(event, container);
                         tooltip.style('left', (mx + 12) + 'px').style('top', (my + 12) + 'px');
-                    }})
-                    .on('mouseleave', function () {{ tooltip.style('opacity', 0); }});
-            }}
+                    })
+                    .on('mouseleave', function () { tooltip.style('opacity', 0); });
+            }
 
-            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {{
+            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {
                 zoomLayer.attr('transform', event.transform);
-            }});
+            });
             svg.call(zoom);
             window.zoomIn = () => svg.transition().duration(300).call(zoom.scaleBy, 1.5);
             window.zoomOut = () => svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
             
-            {zoom_cmd}
-        }}
+            __ZOOM_CMD__
+        }
 
-        if (isFlat) {{ buildFlatMap(); }} else {{ buildGlobe(); }}
+        if (isFlat) { buildFlatMap(); } else { buildGlobe(); }
     </script>
 </body>
 </html>
 """
+
+# Mengganti placeholder secara aman
+map_html = (
+    map_html.replace("__GLOBE_DATA_JSON__", globe_json)
+    .replace("__POV_LAT__", str(pov_lat))
+    .replace("__POV_LNG__", str(pov_lng))
+    .replace("__POV_ALT__", str(pov_alt))
+    .replace("__IS_FLAT_BOOL__", "true" if st.session_state.flat_mode else "false")
+    .replace("__ZOOM_CMD__", zoom_cmd)
+)
 
 components.html(map_html, height=520)
 

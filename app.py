@@ -6,13 +6,12 @@ from streamlit_autorefresh import st_autorefresh
 import json
 import streamlit.components.v1 as components
 
-# TTL cache: 1 jam kalau fetch SUKSES, 15 menit kalau GAGAL (hindari limit API)
+# TTL cache: 1 jam kalau fetch SUKSES, 15 menit kalau GAGAL
 LIVE_TTL = 3600
 RETRY_TTL = 900
 
 @st.cache_resource
 def _get_cache_store(name: str):
-    """Wadah state persisten lintas rerun & lintas user"""
     return {"data": None, "timestamp": 0.0, "is_live": False, "source": "", "last_error": None}
 
 # Konfigurasi Halaman (Full Width)
@@ -22,7 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Sembunyikan Header Streamlit / Logo GitHub / Menu secara Total via CSS
+# Sembunyikan Header Streamlit & Atur Tema Terminal
 st.markdown("""
 <style>
     header {visibility: hidden !important; display: none !important;}
@@ -41,7 +40,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Auto-Refresh setiap 1 Jam (3600 detik)
+# Auto-Refresh setiap 1 Jam
 st_autorefresh(interval=3600 * 1000, key="osint_refresher")
 
 # Translator
@@ -52,7 +51,6 @@ def get_translator():
 translator = get_translator()
 
 def translate_title(text: str, max_retries: int = 2) -> str:
-    """Terjemahkan teks. Jika Google memblokir, langsung kembalikan teks asli."""
     error_keywords = ["Error 500", "502 Bad Gateway", "Server Error", "That's an error"]
     for attempt in range(max_retries):
         try:
@@ -64,9 +62,8 @@ def translate_title(text: str, max_retries: int = 2) -> str:
         time.sleep(0.4 * (attempt + 1))
     return text
 
-# Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
 def fetch_forex_rates():
-    store = _get_cache_store("forex_v2")
+    store = _get_cache_store("forex_v3")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
     if store["data"] is not None and (now - store["timestamp"]) < ttl:
@@ -112,9 +109,8 @@ def fetch_forex_rates():
 
 forex_rates = fetch_forex_rates()
 
-# Fungsi Berita 100% Online (TIDAK ADA DATA STATIS)
 def fetch_live_news():
-    store = _get_cache_store("news_v2")
+    store = _get_cache_store("news_v3")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
     
@@ -127,7 +123,7 @@ def fetch_live_news():
     regions_pool = ["world", "americas", "europe", "middle_east", "asia_pacific", "africa"]
     error_logs = []
 
-    # --- PERCOBAAN 1: GDELT API ---
+    # GDELT API
     articles_list = []
     url_gdelt = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
     try:
@@ -156,7 +152,7 @@ def fetch_live_news():
         store.update({"data": articles_list, "timestamp": now, "is_live": True, "source": "GDELT", "last_error": None})
         return articles_list
 
-    # --- PERCOBAAN 2: BBC WORLD NEWS (BACKUP 1) ---
+    # BBC WORLD NEWS (BACKUP 1)
     bbc_list = []
     url_bbc = "https://api.rss2json.com/v1/api.json?rss_url=http://feeds.bbci.co.uk/news/world/rss.xml"
     try:
@@ -185,7 +181,7 @@ def fetch_live_news():
         store.update({"data": bbc_list, "timestamp": now, "is_live": True, "source": "BBC", "last_error": " | ".join(error_logs)})
         return bbc_list
 
-    # --- PERCOBAAN 3: AL JAZEERA (BACKUP 2) ---
+    # AL JAZEERA (BACKUP 2)
     alj_list = []
     url_alj = "https://api.rss2json.com/v1/api.json?rss_url=https://www.aljazeera.com/xml/rss/all.xml"
     try:
@@ -214,7 +210,6 @@ def fetch_live_news():
         store.update({"data": alj_list, "timestamp": now, "is_live": True, "source": "AL JAZEERA", "last_error": " | ".join(error_logs)})
         return alj_list
 
-    # --- JIKA KONEKSI INTERNET BENAR-BENAR TERPUTUS ---
     error_item = [{
         "title": "KONEKSI TERPUTUS ATAU SELURUH API DIBLOKIR SEMENTARA.", 
         "url": "#", "source": "SYSTEM ALERT", "date": "NOW",
@@ -229,44 +224,12 @@ st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()
-_news_status = _get_cache_store("news_v2")
-
-# BAGIAN INDIKATOR STATUS (TULISAN LIVE/BACKUP/ERROR) TELAH DIHAPUS SEPENUHNYA DI SINI
 
 # Inisialisasi Session State
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "world"
 if "flat_mode" not in st.session_state:
     st.session_state.flat_mode = False
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Menu Navigasi Wilayah & Flat Mode (7 Kolom)
-col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
-
-with col1:
-    if st.button("WORLD", use_container_width=True):
-        st.session_state.selected_region = "world"
-with col2:
-    if st.button("AMERICAS", use_container_width=True):
-        st.session_state.selected_region = "americas"
-with col3:
-    if st.button("EUROPE", use_container_width=True):
-        st.session_state.selected_region = "europe"
-with col4:
-    if st.button("MIDDLE EAST", use_container_width=True):
-        st.session_state.selected_region = "middle_east"
-with col5:
-    if st.button("ASIA PACIFIC", use_container_width=True):
-        st.session_state.selected_region = "asia_pacific"
-with col6:
-    if st.button("AFRICA", use_container_width=True):
-        st.session_state.selected_region = "africa"
-with col7:
-    flat_label = "FLAT: ON" if st.session_state.flat_mode else "FLAT: OFF"
-    if st.button(flat_label, use_container_width=True):
-        st.session_state.flat_mode = not st.session_state.flat_mode
-        st.rerun()
 
 current_region = st.session_state.selected_region
 
@@ -281,17 +244,32 @@ viewpoints = {
 pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
 globe_json = json.dumps(news_items)
 
+query_params = st.query_params
+if "region" in query_params:
+    reg = query_params["region"]
+    if reg in viewpoints or reg == "world":
+        st.session_state.selected_region = reg
+if "flat" in query_params:
+    st.session_state.flat_mode = (query_params["flat"] == "true")
+
 map_html = """
 <!DOCTYPE html>
 <html>
 <head>
     <style>
         body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        #map-container { width: 100%; height: 500px; position: relative; }
-        .crucix-controls { position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; }
+        #map-container { width: 100%; height: 520px; position: relative; }
+        
+        .crucix-top-left { position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 6px; }
         .ctrl-row { display: flex; gap: 4px; align-items: center; }
-        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 14px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; }
-        .crucix-btn:hover { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 8px #00ffccaa; }
+        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; text-decoration: none; }
+        .crucix-btn:hover, .crucix-btn.active { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }
+        .mode-btn { width: auto; padding: 0 12px; font-size: 11px; letter-spacing: 1px; }
+
+        .crucix-bottom-left { position: absolute; bottom: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; background: rgba(5,5,5,0.85); border: 1px solid #00ffcc33; padding: 8px; backdrop-filter: blur(4px); }
+        .region-btn { background: #050505; border: 1px solid #00ffcc44; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 6px 10px; cursor: pointer; text-align: left; text-decoration: none; display: block; }
+        .region-btn:hover, .region-btn.active { border-color: #00ffcc; background: #00ffcc33; color: #fff; }
+
         .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
         .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
         .globe-tooltip a:hover { text-decoration: underline; }
@@ -303,21 +281,45 @@ map_html = """
 </head>
 <body>
     <div id="map-container">
-        <div class="crucix-controls">
-            <div class="ctrl-row"><button class="crucix-btn" onclick="zoomIn()">+</button></div>
+        <div class="crucix-top-left">
+            <div class="ctrl-row">
+                <button class="crucix-btn" onclick="zoomIn()">+</button>
+                <button class="crucix-btn mode-btn" onclick="toggleMode()">mode: <span id="mode-text" style="color:#fff; margin-left:4px;">__MODE_LABEL__</span></button>
+            </div>
             <div class="ctrl-row"><button class="crucix-btn" onclick="zoomOut()">-</button></div>
         </div>
+
+        <div class="crucix-bottom-left">
+            <div style="font-size: 9px; color: #888; margin-bottom: 4px; letter-spacing: 1px;">REGIONAL SECTOR</div>
+            <a class="region-btn __WORLD_ACTIVE__" href="?region=world&flat=__FLAT_PARAM__" target="_self">🌐 WORLD</a>
+            <a class="region-btn __AMERICAS_ACTIVE__" href="?region=americas&flat=__FLAT_PARAM__" target="_self">🌎 AMERICAS</a>
+            <a class="region-btn __EUROPE_ACTIVE__" href="?region=europe&flat=__FLAT_PARAM__" target="_self">🌍 EUROPE</a>
+            <a class="region-btn __MIDDLE_EAST_ACTIVE__" href="?region=middle_east&flat=__FLAT_PARAM__" target="_self">🌍 MIDDLE EAST</a>
+            <a class="region-btn __ASIA_PACIFIC_ACTIVE__" href="?region=asia_pacific&flat=__FLAT_PARAM__" target="_self">🌏 ASIA PACIFIC</a>
+            <a class="region-btn __AFRICA_ACTIVE__" href="?region=africa&flat=__FLAT_PARAM__" target="_self">🌍 AFRICA</a>
+        </div>
     </div>
+
     <script>
         const data = __GLOBE_DATA_JSON__;
-        const isFlat = __FLAT_MODE__;
+        const isFlat = __IS_FLAT_BOOL__;
         const povLat = __POV_LAT__, povLng = __POV_LNG__, povAlt = __POV_ALT__;
         const container = document.getElementById('map-container');
+        
         const arcsData = data.map((d, i) => {
             const target = data[(i + 2) % data.length];
             return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
         });
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[\${d.region.toUpperCase()}]</b><br><a href="\${d.url}" target="_blank">\${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: \${d.source} | \${d.date}</span></div>`;
+        
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.region.toUpperCase()}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${d.source} | ${d.date}</span></div>`;
+
+        function toggleMode() {
+            const newFlat = !isFlat;
+            const url = new URL(window.parent.location.href);
+            url.searchParams.set('flat', newFlat);
+            url.searchParams.set('region', '__CURRENT_REGION__');
+            window.parent.location.href = url.toString();
+        }
 
         function buildGlobe() {
             const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
@@ -344,18 +346,20 @@ map_html = """
                 .arcDashInitialGap(() => Math.random())
                 .arcDashAnimateTime(2000)
                 .pointLabel(tooltipHtml);
+            
             const controls = world.controls();
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.7;
             controls.enableZoom = true;
             world.pointOfView({ lat: povLat, lng: povLng, altitude: povAlt }, 1000);
+            
             window.zoomIn = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500); };
             window.zoomOut = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); };
         }
 
         function buildFlatMap() {
             const width = container.clientWidth || 900;
-            const height = 500;
+            const height = 520;
 
             const svg = d3.select(container).append('svg')
                 .attr('width', width).attr('height', height)
@@ -393,14 +397,22 @@ map_html = """
 
             function drawPointsAndArcs() {
                 const arcsG = contentLayer.append('g');
+                
                 arcsData.forEach(a => {
                     const p1 = projection([a.startLng, a.startLat]);
                     const p2 = projection([a.endLng, a.endLat]);
                     if (!p1 || !p2) return;
-                    const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2 - 45;
+                    
+                    const mx = (p1[0] + p2[0]) / 2;
+                    const my = (p1[1] + p2[1]) / 2 - 50; 
+                    
                     arcsG.append('path')
-                        .attr('d', `M\${p1[0]},\${p1[1]} Q\${mx},\${my} \${p2[0]},\${p2[1]}`)
-                        .attr('fill', 'none').attr('stroke', '#00ffcc55').attr('stroke-width', 1);
+                        .attr('d', `M${p1[0]},${p1[1]} Q${mx},${my} ${p2[0]},${p2[1]}`)
+                        .attr('fill', 'none')
+                        .attr('stroke', '#00ffcc')
+                        .attr('stroke-opacity', 0.35)
+                        .attr('stroke-width', 1.2)
+                        .attr('stroke-dasharray', '4,3');
                 });
 
                 const tooltip = d3.select(container).append('div')
@@ -410,8 +422,8 @@ map_html = """
                 contentLayer.append('g').selectAll('circle').data(data).join('circle')
                     .attr('cx', d => projection([d.lon, d.lat])[0])
                     .attr('cy', d => projection([d.lon, d.lat])[1])
-                    .attr('r', 4.5).attr('fill', '#00ffcc')
-                    .attr('stroke', '#00ffcc').attr('stroke-width', 6).attr('stroke-opacity', 0.15)
+                    .attr('r', 5).attr('fill', '#00ffcc')
+                    .attr('stroke', '#00ffcc').attr('stroke-width', 7).attr('stroke-opacity', 0.2)
                     .style('cursor', 'pointer')
                     .on('mouseenter', function (event, d) {
                         tooltip.style('opacity', 1).html(tooltipHtml(d));
@@ -442,14 +454,22 @@ map_html = (
     .replace("__POV_LAT__", str(pov_lat))
     .replace("__POV_LNG__", str(pov_lng))
     .replace("__POV_ALT__", str(pov_alt))
-    .replace("__FLAT_MODE__", "true" if st.session_state.flat_mode else "false")
+    .replace("__IS_FLAT_BOOL__", "true" if st.session_state.flat_mode else "false")
+    .replace("__MODE_LABEL__", "FLAT" if st.session_state.flat_mode else "GLOBE")
+    .replace("__FLAT_PARAM__", "true" if st.session_state.flat_mode else "false")
+    .replace("__CURRENT_REGION__", current_region)
+    .replace("__WORLD_ACTIVE__", "active" if current_region == 'world' else "")
+    .replace("__AMERICAS_ACTIVE__", "active" if current_region == 'americas' else "")
+    .replace("__EUROPE_ACTIVE__", "active" if current_region == 'europe' else "")
+    .replace("__MIDDLE_EAST_ACTIVE__", "active" if current_region == 'middle_east' else "")
+    .replace("__ASIA_PACIFIC_ACTIVE__", "active" if current_region == 'asia_pacific' else "")
+    .replace("__AFRICA_ACTIVE__", "active" if current_region == 'africa' else "")
 )
 
-components.html(map_html, height=520)
+components.html(map_html, height=540)
 
 st.markdown("---")
 
-# Layout 2 Kolom: Kiri = Live News Ticker (Auto-Scroll), Kanan = Kurs Beli & Jual Valas terhadap IDR
 left_col, right_col = st.columns([1.3, 1])
 
 with left_col:
@@ -479,7 +499,6 @@ with right_col:
     forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
-# Footer & Watermark
 st.markdown("---")
 footer_col1, footer_col2 = st.columns([2, 1])
 with footer_col1:

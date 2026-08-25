@@ -52,21 +52,23 @@ def get_translator():
 translator = get_translator()
 
 def translate_title(text: str, max_retries: int = 2) -> str:
-    """Terjemahkan teks. Jika Google memblokir (Error 500), langsung kembalikan teks asli."""
+    """Terjemahkan teks. Jika Google memblokir, langsung kembalikan teks asli."""
+    error_keywords = ["Error 500", "502 Bad Gateway", "Server Error", "That's an error"]
     for attempt in range(max_retries):
         try:
             result = translator.translate(text)
-            # Filter output sampah dari Google jika API sedang melimitasi IP
-            if result and "Error 500 (Server Error)" not in result and "502 Bad Gateway" not in result:
+            # Filter output sampah: Pastikan tidak ada keyword error di hasil terjemahan
+            if result and not any(err in result for err in error_keywords):
                 return result
         except Exception:
             pass
         time.sleep(0.4 * (attempt + 1))
-    return text  # Jika gagal diterjemahkan, biarkan bahasa Inggris.
+    return text  # Jika gagal diterjemahkan, biarkan bahasa Inggris aslinya.
 
 # Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
 def fetch_forex_rates():
-    store = _get_cache_store("forex")
+    # Menggunakan cache key "forex_v2" untuk force reset
+    store = _get_cache_store("forex_v2")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
     if store["data"] is not None and (now - store["timestamp"]) < ttl:
@@ -114,7 +116,8 @@ forex_rates = fetch_forex_rates()
 
 # Fungsi Berita 100% Online (TIDAK ADA DATA STATIS)
 def fetch_live_news():
-    store = _get_cache_store("news")
+    # MENGGUNAKAN CACHE KEY BARU "news_v2" AGAR MEMORI LAMA (YANG BERISI ERROR) TERHAPUS
+    store = _get_cache_store("news_v2")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
     
@@ -230,7 +233,7 @@ st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()
-_news_status = _get_cache_store("news")
+_news_status = _get_cache_store("news_v2")
 
 # Indikator Status Terminal
 if _news_status.get("is_live"):

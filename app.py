@@ -587,10 +587,20 @@ with left_col:
             st.markdown(trend_html, unsafe_allow_html=True)
 
 with right_col:
-    # 1. Modul 2: Threat Analytics (Kanan Atas)
+    # 1. Modul 2: Threat Analytics DENGAN LINK TARGET LANGSUNG (Kanan Atas)
     total_leaks = len(darkweb_items)
     unique_gangs = len(set(d.get("group", "Unknown") for d in darkweb_items))
     
+    # Generate list link target aktif langsung di dalam analitik
+    active_links_html = ""
+    for dw in darkweb_items[:3]:
+        active_links_html += f"""
+        <div style="font-size: 10px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #ff6666;">• [{dw.get('group', 'Gang')}]</span>
+            <a href="{dw.get('url', '#')}" target="_blank" style="color: #00ffcc; text-decoration: none;">{dw.get('target', 'Target')[:22]}... &nearr;</a>
+        </div>
+        """
+
     analytics_html = f"""
     <div style="background: #080808; border: 1px solid #331111; border-radius: 4px; padding: 12px 15px; margin-bottom: 15px;">
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; color: #ff5555; border-bottom: 1px solid #221111; padding-bottom: 6px; margin-bottom: 8px;">
@@ -609,9 +619,9 @@ with right_col:
             <span>Threat Level Status:</span>
             <b style="color: #ffaa00;">HIGH / CRITICAL</b>
         </div>
-        <div style="border-top: 1px dashed #221111; padding-top: 6px; font-size: 10px; color: #888; display: flex; justify-content: space-between;">
-            <span>Ref: Ransomware.live API</span>
-            <a href="https://api.ransomware.live/v2/recentvictims" target="_blank" style="color: #00ffcc; text-decoration: none;">[API Endpoint &nearr;]</a>
+        <div style="border-top: 1px dashed #221111; padding-top: 6px; margin-top: 6px;">
+            <span style="font-size: 10px; color: #888; font-weight: bold;">LATEST HIGHLIGHT LINKS:</span>
+            {active_links_html}
         </div>
     </div>
     """

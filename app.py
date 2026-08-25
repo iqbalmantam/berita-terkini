@@ -587,7 +587,7 @@ with left_col:
             st.markdown(trend_html, unsafe_allow_html=True)
 
 with right_col:
-    # 1. Modul 2: Threat Analytics DENGAN BARIS HTML TANPA INDENTASI MENCOLOK
+    # 1. Modul 2: Threat Analytics
     total_leaks = len(darkweb_items)
     unique_gangs = len(set(d.get("group", "Unknown") for d in darkweb_items))
     
@@ -602,7 +602,7 @@ with right_col:
     
     st.markdown(analytics_html, unsafe_allow_html=True)
 
-    # 2. Kurs Valas Asing
+    # 2. Kurs Valas Asing (Tinggi kontainer ditingkatkan menjadi max-height: 320px agar EUR dan mata uang lainnya tidak terpotong)
     forex_cards_html = ""
     currencies_meta = [
         ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
@@ -618,7 +618,7 @@ with right_col:
         
         forex_cards_html += f'<div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;"><span><b>{code} / IDR</b> ({name})</span><span style="color: #00ffcc;">LIVE 1H</span></div><div style="display: flex; justify-content: space-between; font-size: 12px; font-family: \'Courier New\', Courier, monospace;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div></div></div>'
 
-    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 180px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
+    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 320px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
     st.markdown(forex_widget_html, unsafe_allow_html=True)
 
     # 3. Live Darkweb & Ransomware Leaks (Kanan Bawah)

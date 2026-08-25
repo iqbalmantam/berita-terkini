@@ -6,13 +6,12 @@ from streamlit_autorefresh import st_autorefresh
 import json
 import streamlit.components.v1 as components
 
-# TTL cache: 1 jam kalau fetch SUKSES, 15 menit kalau GAGAL (hindari limit API)
+# TTL cache: 1 jam kalau fetch SUKSES, 15 menit kalau GAGAL
 LIVE_TTL = 3600
 RETRY_TTL = 900
 
 @st.cache_resource
 def _get_cache_store(name: str):
-    """Wadah state persisten lintas rerun & lintas user"""
     return {"data": None, "timestamp": 0.0, "is_live": False, "source": "", "last_error": None}
 
 # Konfigurasi Halaman (Full Width)
@@ -22,7 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Sembunyikan Header Streamlit / Logo GitHub / Menu secara Total via CSS
+# Sembunyikan Header Streamlit & Atur Tema Terminal
 st.markdown("""
 <style>
     header {visibility: hidden !important; display: none !important;}
@@ -41,7 +40,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Auto-Refresh setiap 1 Jam (3600 detik)
+# Auto-Refresh setiap 1 Jam
 st_autorefresh(interval=3600 * 1000, key="osint_refresher")
 
 # Translator
@@ -52,23 +51,19 @@ def get_translator():
 translator = get_translator()
 
 def translate_title(text: str, max_retries: int = 2) -> str:
-    """Terjemahkan teks. Jika Google memblokir, langsung kembalikan teks asli."""
     error_keywords = ["Error 500", "502 Bad Gateway", "Server Error", "That's an error"]
     for attempt in range(max_retries):
         try:
             result = translator.translate(text)
-            # Filter output sampah: Pastikan tidak ada keyword error di hasil terjemahan
             if result and not any(err in result for err in error_keywords):
                 return result
         except Exception:
             pass
         time.sleep(0.4 * (attempt + 1))
-    return text  # Jika gagal diterjemahkan, biarkan bahasa Inggris aslinya.
+    return text
 
-# Fungsi Ambil Data Kurs Valas Live & Update Otomatis per 1 Jam
 def fetch_forex_rates():
-    # Menggunakan cache key "forex_v2" untuk force reset
-    store = _get_cache_store("forex_v2")
+    store = _get_cache_store("forex_v3")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
     if store["data"] is not None and (now - store["timestamp"]) < ttl:
@@ -114,10 +109,8 @@ def fetch_forex_rates():
 
 forex_rates = fetch_forex_rates()
 
-# Fungsi Berita 100% Online (TIDAK ADA DATA STATIS)
 def fetch_live_news():
-    # MENGGUNAKAN CACHE KEY BARU "news_v2" AGAR MEMORI LAMA (YANG BERISI ERROR) TERHAPUS
-    store = _get_cache_store("news_v2")
+    store = _get_cache_store("news_v3")
     now = time.time()
     ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
     
@@ -130,7 +123,7 @@ def fetch_live_news():
     regions_pool = ["world", "americas", "europe", "middle_east", "asia_pacific", "africa"]
     error_logs = []
 
-    # --- PERCOBAAN 1: GDELT API ---
+    # GDELT API
     articles_list = []
     url_gdelt = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
     try:
@@ -159,7 +152,7 @@ def fetch_live_news():
         store.update({"data": articles_list, "timestamp": now, "is_live": True, "source": "GDELT", "last_error": None})
         return articles_list
 
-    # --- PERCOBAAN 2: BBC WORLD NEWS (BACKUP 1) ---
+    # BBC WORLD NEWS (BACKUP 1)
     bbc_list = []
     url_bbc = "https://api.rss2json.com/v1/api.json?rss_url=http://feeds.bbci.co.uk/news/world/rss.xml"
     try:
@@ -188,7 +181,7 @@ def fetch_live_news():
         store.update({"data": bbc_list, "timestamp": now, "is_live": True, "source": "BBC", "last_error": " | ".join(error_logs)})
         return bbc_list
 
-    # --- PERCOBAAN 3: AL JAZEERA (BACKUP 2) ---
+    # AL JAZEERA (BACKUP 2)
     alj_list = []
     url_alj = "https://api.rss2json.com/v1/api.json?rss_url=https://www.aljazeera.com/xml/rss/all.xml"
     try:
@@ -217,8 +210,6 @@ def fetch_live_news():
         store.update({"data": alj_list, "timestamp": now, "is_live": True, "source": "AL JAZEERA", "last_error": " | ".join(error_logs)})
         return alj_list
 
-    # --- JIKA KONEKSI INTERNET BENAR-BENAR TERPUTUS (TIDAK ADA DATA STATIS) ---
-    # Memunculkan satu item notifikasi error agar UI terminal tidak crash
     error_item = [{
         "title": "KONEKSI TERPUTUS ATAU SELURUH API DIBLOKIR SEMENTARA.", 
         "url": "#", "source": "SYSTEM ALERT", "date": "NOW",
@@ -233,9 +224,8 @@ st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · AUTO-TRANSLATE ACTIVE (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()
-_news_status = _get_cache_store("news_v2")
+_news_status = _get_cache_store("news_v3")
 
-# Indikator Status Terminal
 if _news_status.get("is_live"):
     src = _news_status.get("source", "")
     if src == "GDELT":
@@ -255,33 +245,6 @@ if "flat_mode" not in st.session_state:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Menu Navigasi Wilayah & Flat Mode (7 Kolom)
-col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
-
-with col1:
-    if st.button("WORLD", use_container_width=True):
-        st.session_state.selected_region = "world"
-with col2:
-    if st.button("AMERICAS", use_container_width=True):
-        st.session_state.selected_region = "americas"
-with col3:
-    if st.button("EUROPE", use_container_width=True):
-        st.session_state.selected_region = "europe"
-with col4:
-    if st.button("MIDDLE EAST", use_container_width=True):
-        st.session_state.selected_region = "middle_east"
-with col5:
-    if st.button("ASIA PACIFIC", use_container_width=True):
-        st.session_state.selected_region = "asia_pacific"
-with col6:
-    if st.button("AFRICA", use_container_width=True):
-        st.session_state.selected_region = "africa"
-with col7:
-    flat_label = "FLAT: ON" if st.session_state.flat_mode else "FLAT: OFF"
-    if st.button(flat_label, use_container_width=True):
-        st.session_state.flat_mode = not st.session_state.flat_mode
-        st.rerun()
-
 current_region = st.session_state.selected_region
 
 viewpoints = {
@@ -295,20 +258,38 @@ viewpoints = {
 pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
 globe_json = json.dumps(news_items)
 
-map_html = """
+# Menerima interaksi klik tombol dari JavaScript di dalam iframe via query params atau callback sederhana
+query_params = st.query_params
+if "region" in query_params:
+    reg = query_params["region"]
+    if reg in viewpoints or reg == "world":
+        st.session_state.selected_region = reg
+if "flat" in query_params:
+    st.session_state.flat_mode = (query_params["flat"] == "true")
+
+map_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-        body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        #map-container { width: 100%; height: 500px; position: relative; }
-        .crucix-controls { position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; }
-        .ctrl-row { display: flex; gap: 4px; align-items: center; }
-        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 14px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; }
-        .crucix-btn:hover { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 8px #00ffccaa; }
-        .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
-        .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
-        .globe-tooltip a:hover { text-decoration: underline; }
+        body {{ margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }}
+        #map-container {{ width: 100%; height: 520px; position: relative; }}
+        
+        /* Kontrol Kiri Atas ala Crucix.live */
+        .crucix-top-left {{ position: absolute; top: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 6px; }}
+        .ctrl-row {{ display: flex; gap: 4px; align-items: center; }}
+        .crucix-btn {{ background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; font-weight: bold; text-decoration: none; }}
+        .crucix-btn:hover, .crucix-btn.active {{ border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }}
+        .mode-btn {{ width: auto; padding: 0 12px; font-size: 11px; letter-spacing: 1px; }}
+
+        /* Menu Wilayah Kiri Bawah ala Crucix.live */
+        .crucix-bottom-left {{ position: absolute; bottom: 15px; left: 15px; z-index: 99; display: flex; flex-direction: column; gap: 4px; background: rgba(5,5,5,0.85); border: 1px solid #00ffcc33; padding: 8px; backdrop-filter: blur(4px); }}
+        .region-btn {{ background: #050505; border: 1px solid #00ffcc44; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 6px 10px; cursor: pointer; text-align: left; text-decoration: none; display: block; }}
+        .region-btn:hover, .region-btn.active {{ border-color: #00ffcc; background: #00ffcc33; color: #fff; }}
+
+        .globe-tooltip {{ background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }}
+        .globe-tooltip a {{ color: #00ffcc; text-decoration: none; font-weight: bold; }}
+        .globe-tooltip a:hover {{ text-decoration: underline; }}
     </style>
     <script src="https://unpkg.com/three"></script>
     <script src="https://unpkg.com/globe.gl"></script>
@@ -317,23 +298,50 @@ map_html = """
 </head>
 <body>
     <div id="map-container">
-        <div class="crucix-controls">
-            <div class="ctrl-row"><button class="crucix-btn" onclick="zoomIn()">+</button></div>
+        <!-- KONTROL KIRI ATAS: ZOOM & MODE -->
+        <div class="crucix-top-left">
+            <div class="ctrl-row">
+                <button class="crucix-btn" onclick="zoomIn()">+</button>
+                <button class="crucix-btn mode-btn" onclick="toggleMode()">mode: <span id="mode-text" style="color:#fff; margin-left:4px;">{"FLAT" if st.session_state.flat_mode else "GLOBE"}</span></button>
+            </div>
             <div class="ctrl-row"><button class="crucix-btn" onclick="zoomOut()">-</button></div>
         </div>
-    </div>
-    <script>
-        const data = __GLOBE_DATA_JSON__;
-        const isFlat = __FLAT_MODE__;
-        const povLat = __POV_LAT__, povLng = __POV_LNG__, povAlt = __POV_ALT__;
-        const container = document.getElementById('map-container');
-        const arcsData = data.map((d, i) => {
-            const target = data[(i + 2) % data.length];
-            return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
-        });
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[\${d.region.toUpperCase()}]</b><br><a href="\${d.url}" target="_blank">\${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: \${d.source} | \${d.date}</span></div>`;
 
-        function buildGlobe() {
+        <!-- KONTROL KIRI BAWAH: NAVIGASI WILAYAH -->
+        <div class="crucix-bottom-left">
+            <div style="font-size: 9px; color: #888; margin-bottom: 4px; letter-spacing: 1px;">REGIONAL SECTOR</div>
+            <a class="region-btn {'active' if current_region=='world' else ''}" href="?region=world&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌐 WORLD</a>
+            <a class="region-btn {'active' if current_region=='americas' else ''}" href="?region=americas&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌎 AMERICAS</a>
+            <a class="region-btn {'active' if current_region=='europe' else ''}" href="?region=europe&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌍 EUROPE</a>
+            <a class="region-btn {'active' if current_region=='middle_east' else ''}" href="?region=middle_east&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌍 MIDDLE EAST</a>
+            <a class="region-btn {'active' if current_region=='asia_pacific' else ''}" href="?region=asia_pacific&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌏 ASIA PACIFIC</a>
+            <a class="region-btn {'active' if current_region=='africa' else ''}" href="?region=africa&flat={'true' if st.session_state.flat_mode else 'false'}" target="_self">🌍 AFRICA</a>
+        </div>
+    </div>
+
+    <script>
+        const data = {globe_json};
+        const isFlat = {"true" if st.session_state.flat_mode else "false"};
+        const povLat = {pov_lat}, povLng = {pov_lng}, povAlt = {pov_alt};
+        const container = document.getElementById('map-container');
+        
+        const arcsData = data.map((d, i) => {{
+            const target = data[(i + 2) % data.length];
+            return {{ startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] }};
+        }});
+        
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${{d.region.toUpperCase()}}]</b><br><a href="${{d.url}}" target="_blank">${{d.title}}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${{d.source}} | ${{d.date}}</span></div>`;
+
+        function toggleMode() {{
+            const newFlat = !isFlat;
+            const url = new URL(window.parent.location.href);
+            url.searchParams.set('flat', newFlat);
+            url.searchParams.set('region', '{current_region}');
+            window.parent.location.href = url.toString();
+        }}
+
+        // MODE 1: GLOBE 3D
+        function buildGlobe() {{
             const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
                 (container)
@@ -358,18 +366,21 @@ map_html = """
                 .arcDashInitialGap(() => Math.random())
                 .arcDashAnimateTime(2000)
                 .pointLabel(tooltipHtml);
+            
             const controls = world.controls();
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.7;
             controls.enableZoom = true;
-            world.pointOfView({ lat: povLat, lng: povLng, altitude: povAlt }, 1000);
-            window.zoomIn = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500); };
-            window.zoomOut = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); };
+            world.pointOfView({{ lat: povLat, lng: povLng, altitude: povAlt }}, 1000);
+            
+            window.zoomIn = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }}, 500); }};
+            window.zoomOut = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }}, 500); }};
         }
 
-        function buildFlatMap() {
+        // MODE 2: PETA DATAR 2D DENGAN GARIS PENGHUBUNG (ARCS)
+        function buildFlatMap() {{
             const width = container.clientWidth || 900;
-            const height = 500;
+            const height = 520;
 
             const svg = d3.select(container).append('svg')
                 .attr('width', width).attr('height', height)
@@ -379,11 +390,11 @@ map_html = """
 
             const projection = d3.geoEquirectangular()
                 .rotate([-povLng, 0])
-                .fitSize([width, height], { type: 'Sphere' });
+                .fitSize([width, height], {{ type: 'Sphere' }});
             const geoPath = d3.geoPath(projection);
 
             zoomLayer.append('path')
-                .datum({ type: 'Sphere' })
+                .datum({{ type: 'Sphere' }})
                 .attr('d', geoPath)
                 .attr('fill', '#060c0b').attr('stroke', '#1a3630').attr('stroke-width', 1);
 
@@ -396,26 +407,36 @@ map_html = """
             const contentLayer = zoomLayer.append('g');
 
             d3.json('https://unpkg.com/world-atlas@2/countries-110m.json')
-                .then(topo => {
+                .then(topo => {{
                     const countries = topojson.feature(topo, topo.objects.countries);
                     countryLayer.selectAll('path').data(countries.features).join('path')
                         .attr('d', geoPath)
                         .attr('fill', '#0a1a16').attr('stroke', '#00ffcc44').attr('stroke-width', 0.6);
-                })
-                .catch(() => {})
+                }})
+                .catch(() => {{}})
                 .finally(() => drawPointsAndArcs());
 
-            function drawPointsAndArcs() {
+            function drawPointsAndArcs() {{
                 const arcsG = contentLayer.append('g');
-                arcsData.forEach(a => {
+                
+                // Menerapkan Garis Penghubung Lengkung (Arcs) ala Crucix.live
+                arcsData.forEach(a => {{
                     const p1 = projection([a.startLng, a.startLat]);
                     const p2 = projection([a.endLng, a.endLat]);
                     if (!p1 || !p2) return;
-                    const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2 - 45;
+                    
+                    // Membuat kurva lengkung di atas (quadratic bezier curve)
+                    const mx = (p1[0] + p2[0]) / 2;
+                    const my = (p1[1] + p2[1]) / 2 - 50; 
+                    
                     arcsG.append('path')
-                        .attr('d', `M\${p1[0]},\${p1[1]} Q\${mx},\${my} \${p2[0]},\${p2[1]}`)
-                        .attr('fill', 'none').attr('stroke', '#00ffcc55').attr('stroke-width', 1);
-                });
+                        .attr('d', `M${{p1[0]}},${{p1[1]}} Q${{mx}},${{my}} ${{p2[0]}},${{p2[1]}}`)
+                        .attr('fill', 'none')
+                        .attr('stroke', '#00ffcc')
+                        .attr('stroke-opacity', 0.35)
+                        .attr('stroke-width', 1.2)
+                        .attr('stroke-dasharray', '4,3');
+                }});
 
                 const tooltip = d3.select(container).append('div')
                     .style('position', 'absolute').style('pointer-events', 'none')
@@ -424,46 +445,38 @@ map_html = """
                 contentLayer.append('g').selectAll('circle').data(data).join('circle')
                     .attr('cx', d => projection([d.lon, d.lat])[0])
                     .attr('cy', d => projection([d.lon, d.lat])[1])
-                    .attr('r', 4.5).attr('fill', '#00ffcc')
-                    .attr('stroke', '#00ffcc').attr('stroke-width', 6).attr('stroke-opacity', 0.15)
+                    .attr('r', 5).attr('fill', '#00ffcc')
+                    .attr('stroke', '#00ffcc').attr('stroke-width', 7).attr('stroke-opacity', 0.2)
                     .style('cursor', 'pointer')
-                    .on('mouseenter', function (event, d) {
+                    .on('mouseenter', function (event, d) {{
                         tooltip.style('opacity', 1).html(tooltipHtml(d));
-                    })
-                    .on('mousemove', function (event) {
+                    }})
+                    .on('mousemove', function (event) {{
                         const [mx, my] = d3.pointer(event, container);
                         tooltip.style('left', (mx + 12) + 'px').style('top', (my + 12) + 'px');
-                    })
-                    .on('mouseleave', function () { tooltip.style('opacity', 0); });
-            }
+                    }})
+                    .on('mouseleave', function () {{ tooltip.style('opacity', 0); }});
+            }}
 
-            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {
+            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {{
                 zoomLayer.attr('transform', event.transform);
-            });
+            }});
             svg.call(zoom);
             window.zoomIn = () => svg.transition().duration(300).call(zoom.scaleBy, 1.5);
             window.zoomOut = () => svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
-        }
+        }}
 
-        if (isFlat) { buildFlatMap(); } else { buildGlobe(); }
+        if (isFlat) {{ buildFlatMap(); }} else {{ buildGlobe(); }}
     </script>
 </body>
 </html>
 """
 
-map_html = (
-    map_html.replace("__GLOBE_DATA_JSON__", globe_json)
-    .replace("__POV_LAT__", str(pov_lat))
-    .replace("__POV_LNG__", str(pov_lng))
-    .replace("__POV_ALT__", str(pov_alt))
-    .replace("__FLAT_MODE__", "true" if st.session_state.flat_mode else "false")
-)
-
-components.html(map_html, height=520)
+components.html(map_html, height=540)
 
 st.markdown("---")
 
-# Layout 2 Kolom: Kiri = Live News Ticker (Auto-Scroll), Kanan = Kurs Beli & Jual Valas terhadap IDR
+# Layout 2 Kolom: Kiri = Live News Ticker, Kanan = Kurs Valas
 left_col, right_col = st.columns([1.3, 1])
 
 with left_col:

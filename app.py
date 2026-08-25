@@ -232,8 +232,42 @@ if "selected_region" not in st.session_state:
 if "flat_mode" not in st.session_state:
     st.session_state.flat_mode = False
 
-current_region = st.session_state.selected_region
+# --- KONTROL TOMBOL DI ATAS PETA (MENU & MODE/ZOOM) MENGGUNAKAN STREAMLIT NATIF ---
+menu_cols = st.columns(6)
+regions = [
+    ("world", "WORLD"),
+    ("americas", "AMERICAS"),
+    ("europe", "EUROPE"),
+    ("middle_east", "MIDDLE EAST"),
+    ("asia_pacific", "ASIA PACIFIC"),
+    ("africa", "AFRICA")
+]
 
+for i, (reg_key, reg_name) in enumerate(regions):
+    with menu_cols[i]:
+        is_active = (st.session_state.selected_region == reg_key)
+        btn_label = f"🟢 {reg_name}" if is_active else reg_name
+        if st.button(btn_label, use_container_width=True, key=f"reg_{reg_key}"):
+            st.session_state.selected_region = reg_key
+            st.rerun()
+
+# Baris kedua: Tombol Zoom (+, -) dan Mode Switcher di kiri atas peta
+ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col_rest = st.columns([0.5, 0.5, 2.0, 7.0])
+with ctrl_col1:
+    if st.button("+", use_container_width=True, key="zoom_in_btn"):
+        st.session_state["zoom_action"] = "in"
+        st.rerun()
+with ctrl_col2:
+    if st.button("-", use_container_width=True, key="zoom_out_btn"):
+        st.session_state["zoom_action"] = "out"
+        st.rerun()
+with ctrl_col3:
+    mode_label = "FLAT MODE" if st.session_state.flat_mode else "GLOBE MODE"
+    if st.button(mode_label, use_container_width=True, key="mode_switch_btn"):
+        st.session_state.flat_mode = not st.session_state.flat_mode
+        st.rerun()
+
+current_region = st.session_state.selected_region
 viewpoints = {
     "world": (0, 0, 2.5),
     "americas": (20, -90, 1.6),
@@ -245,37 +279,25 @@ viewpoints = {
 pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
 globe_json = json.dumps(news_items)
 
-query_params = st.query_params
-if "region" in query_params:
-    reg = query_params["region"]
-    if reg in viewpoints or reg == "world":
-        st.session_state.selected_region = reg
-if "flat" in query_params:
-    st.session_state.flat_mode = (query_params["flat"] == "true")
+# Menentukan instruksi zoom untuk JavaScript
+zoom_cmd = ""
+if "zoom_action" in st.session_state:
+    action = st.session_state.pop("zoom_action")
+    if action == "in":
+        zoom_cmd = "window.zoomIn && window.zoomIn();"
+    elif action == "out":
+        zoom_cmd = "window.zoomOut && window.zoomOut();"
 
-map_html = """
+map_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-        body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        
-        /* Menu Wilayah di Atas */
-        .crucix-top-menu { display: flex; gap: 4px; background: #080808; border: 1px solid #1a2b27; padding: 4px; margin-bottom: 6px; width: 100%; box-sizing: border-box; }
-        .region-tab { background: #050505; border: 1px solid #00ffcc33; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 11px; padding: 10px 16px; cursor: pointer; text-align: center; text-decoration: none; flex: 1; font-weight: bold; letter-spacing: 1px; }
-        .region-tab:hover, .region-tab.active { border-color: #00ffcc; background: #00ffcc22; color: #fff; }
-
-        /* Bar Kontrol Zoom & Mode di Bawah Menu Wilayah */
-        .crucix-control-bar { display: flex; gap: 4px; background: #080808; border: 1px solid #1a2b27; padding: 6px; margin-bottom: 8px; width: 100%; box-sizing: border-box; align-items: center; }
-        .crucix-btn { background: #050505; border: 1px solid #00ffcc55; color: #00ffcc; font-family: 'Courier New', Courier, monospace; font-size: 14px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-weight: bold; text-decoration: none; }
-        .crucix-btn:hover { border-color: #00ffcc; background: #00ffcc22; box-shadow: 0 0 10px #00ffccaa; color: #fff; }
-        .mode-btn { width: auto; height: 34px; padding: 0 16px; font-size: 11px; letter-spacing: 1px; }
-
-        #map-container { width: 100%; height: 500px; position: relative; border: 1px solid #1a2b27; background: #050505; }
-        
-        .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
-        .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
-        .globe-tooltip a:hover { text-decoration: underline; }
+        body {{ margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }}
+        #map-container {{ width: 100%; height: 500px; position: relative; border: 1px solid #1a2b27; background: #050505; }}
+        .globe-tooltip {{ background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }}
+        .globe-tooltip a {{ color: #00ffcc; text-decoration: none; font-weight: bold; }}
+        .globe-tooltip a:hover {{ text-decoration: underline; }}
     </style>
     <script src="https://unpkg.com/three"></script>
     <script src="https://unpkg.com/globe.gl"></script>
@@ -283,47 +305,22 @@ map_html = """
     <script src="https://unpkg.com/topojson-client@3"></script>
 </head>
 <body>
-    <!-- Menu Wilayah di Atas -->
-    <div class="crucix-top-menu">
-        <a class="region-tab __WORLD_ACTIVE__" href="?region=world&flat=__FLAT_PARAM__" target="_self">WORLD</a>
-        <a class="region-tab __AMERICAS_ACTIVE__" href="?region=americas&flat=__FLAT_PARAM__" target="_self">AMERICAS</a>
-        <a class="region-tab __EUROPE_ACTIVE__" href="?region=europe&flat=__FLAT_PARAM__" target="_self">EUROPE</a>
-        <a class="region-tab __MIDDLE_EAST_ACTIVE__" href="?region=middle_east&flat=__FLAT_PARAM__" target="_self">MIDDLE EAST</a>
-        <a class="region-tab __ASIA_PACIFIC_ACTIVE__" href="?region=asia_pacific&flat=__FLAT_PARAM__" target="_self">ASIA PACIFIC</a>
-        <a class="region-tab __AFRICA_ACTIVE__" href="?region=africa&flat=__FLAT_PARAM__" target="_self">AFRICA</a>
-    </div>
-
-    <!-- Bar Kontrol Tombol (+, -, Mode Switcher) -->
-    <div class="crucix-control-bar">
-        <button class="crucix-btn" onclick="zoomIn()">+</button>
-        <button class="crucix-btn" onclick="zoomOut()">-</button>
-        <button class="crucix-btn mode-btn" onclick="toggleMode()"><span id="mode-text" style="color:#00ffcc;">__MODE_LABEL__</span></button>
-    </div>
-
     <div id="map-container"></div>
 
     <script>
-        const data = __GLOBE_DATA_JSON__;
-        const isFlat = __IS_FLAT_BOOL__;
-        const povLat = __POV_LAT__, povLng = __POV_LNG__, povAlt = __POV_ALT__;
+        const data = {globe_json};
+        const isFlat = {"true" if st.session_state.flat_mode else "false"};
+        const povLat = {pov_lat}, povLng = {pov_lng}, povAlt = {pov_alt};
         const container = document.getElementById('map-container');
         
-        const arcsData = data.map((d, i) => {
+        const arcsData = data.map((d, i) => {{
             const target = data[(i + 2) % data.length];
-            return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
-        });
+            return {{ startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] }};
+        }});
         
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.region.toUpperCase()}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${d.source} | ${d.date}</span></div>`;
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${{d.region.toUpperCase()}}]</b><br><a href="${{d.url}}" target="_blank">${{d.title}}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">SRC: ${{d.source}} | ${{d.date}}</span></div>`;
 
-        function toggleMode() {
-            const newFlat = !isFlat;
-            const url = new URL(window.parent.location.href);
-            url.searchParams.set('flat', newFlat);
-            url.searchParams.set('region', '__CURRENT_REGION__');
-            window.parent.location.href = url.toString();
-        }
-
-        function buildGlobe() {
+        function buildGlobe() {{
             const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
                 (container)
@@ -353,13 +350,15 @@ map_html = """
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.7;
             controls.enableZoom = true;
-            world.pointOfView({ lat: povLat, lng: povLng, altitude: povAlt }, 1000);
+            world.pointOfView({{ lat: povLat, lng: povLng, altitude: povAlt }}, 1000);
             
-            window.zoomIn = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500); };
-            window.zoomOut = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); };
-        }
+            window.zoomIn = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }}, 500); }};
+            window.zoomOut = () => {{ const pov = world.pointOfView(); world.pointOfView({{ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }}, 500); }};
+            
+            {zoom_cmd}
+        }}
 
-        function buildFlatMap() {
+        function buildFlatMap() {{
             const width = container.clientWidth || 900;
             const height = 500;
 
@@ -371,11 +370,11 @@ map_html = """
 
             const projection = d3.geoEquirectangular()
                 .rotate([-povLng, 0])
-                .fitSize([width, height], { type: 'Sphere' });
+                .fitSize([width, height], {{ type: 'Sphere' }});
             const geoPath = d3.geoPath(projection);
 
             zoomLayer.append('path')
-                .datum({ type: 'Sphere' })
+                .datum({{ type: 'Sphere' }})
                 .attr('d', geoPath)
                 .attr('fill', '#060c0b').attr('stroke', '#1a3630').attr('stroke-width', 1);
 
@@ -388,19 +387,19 @@ map_html = """
             const contentLayer = zoomLayer.append('g');
 
             d3.json('https://unpkg.com/world-atlas@2/countries-110m.json')
-                .then(topo => {
+                .then(topo => {{
                     const countries = topojson.feature(topo, topo.objects.countries);
                     countryLayer.selectAll('path').data(countries.features).join('path')
                         .attr('d', geoPath)
                         .attr('fill', '#0a1a16').attr('stroke', '#00ffcc44').attr('stroke-width', 0.6);
-                })
-                .catch(() => {})
+                }})
+                .catch(() => {{}})
                 .finally(() => drawPointsAndArcs());
 
-            function drawPointsAndArcs() {
+            function drawPointsAndArcs() {{
                 const arcsG = contentLayer.append('g');
                 
-                arcsData.forEach(a => {
+                arcsData.forEach(a => {{
                     const p1 = projection([a.startLng, a.startLat]);
                     const p2 = projection([a.endLng, a.endLat]);
                     if (!p1 || !p2) return;
@@ -409,13 +408,13 @@ map_html = """
                     const my = (p1[1] + p2[1]) / 2 - 50; 
                     
                     arcsG.append('path')
-                        .attr('d', `M${p1[0]},${p1[1]} Q${mx},${my} ${p2[0]},${p2[1]}`)
+                        .attr('d', `M${{p1[0]}},${{p1[1]}} Q${{mx}},${{my}} ${{p2[0]}},${{p2[1]}}`)
                         .attr('fill', 'none')
                         .attr('stroke', '#00ffcc')
                         .attr('stroke-opacity', 0.35)
                         .attr('stroke-width', 1.2)
                         .attr('stroke-dasharray', '4,3');
-                });
+                }});
 
                 const tooltip = d3.select(container).append('div')
                     .style('position', 'absolute').style('pointer-events', 'none')
@@ -427,48 +426,33 @@ map_html = """
                     .attr('r', 5).attr('fill', '#00ffcc')
                     .attr('stroke', '#00ffcc').attr('stroke-width', 7).attr('stroke-opacity', 0.2)
                     .style('cursor', 'pointer')
-                    .on('mouseenter', function (event, d) {
+                    .on('mouseenter', function (event, d) {{
                         tooltip.style('opacity', 1).html(tooltipHtml(d));
-                    })
-                    .on('mousemove', function (event) {
+                    }})
+                    .on('mousemove', function (event) {{
                         const [mx, my] = d3.pointer(event, container);
                         tooltip.style('left', (mx + 12) + 'px').style('top', (my + 12) + 'px');
-                    })
-                    .on('mouseleave', function () { tooltip.style('opacity', 0); });
-            }
+                    }})
+                    .on('mouseleave', function () {{ tooltip.style('opacity', 0); }});
+            }}
 
-            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {
+            const zoom = d3.zoom().scaleExtent([1, 8]).on('zoom', (event) => {{
                 zoomLayer.attr('transform', event.transform);
-            });
+            }});
             svg.call(zoom);
             window.zoomIn = () => svg.transition().duration(300).call(zoom.scaleBy, 1.5);
             window.zoomOut = () => svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
-        }
+            
+            {zoom_cmd}
+        }}
 
-        if (isFlat) { buildFlatMap(); } else { buildGlobe(); }
+        if (isFlat) {{ buildFlatMap(); }} else {{ buildGlobe(); }}
     </script>
 </body>
 </html>
 """
 
-map_html = (
-    map_html.replace("__GLOBE_DATA_JSON__", globe_json)
-    .replace("__POV_LAT__", str(pov_lat))
-    .replace("__POV_LNG__", str(pov_lng))
-    .replace("__POV_ALT__", str(pov_alt))
-    .replace("__IS_FLAT_BOOL__", "true" if st.session_state.flat_mode else "false")
-    .replace("__MODE_LABEL__", "FLAT MODE" if st.session_state.flat_mode else "GLOBE MODE")
-    .replace("__FLAT_PARAM__", "false" if st.session_state.flat_mode else "true")
-    .replace("__CURRENT_REGION__", current_region)
-    .replace("__WORLD_ACTIVE__", "active" if current_region == 'world' else "")
-    .replace("__AMERICAS_ACTIVE__", "active" if current_region == 'americas' else "")
-    .replace("__EUROPE_ACTIVE__", "active" if current_region == 'europe' else "")
-    .replace("__MIDDLE_EAST_ACTIVE__", "active" if current_region == 'middle_east' else "")
-    .replace("__ASIA_PACIFIC_ACTIVE__", "active" if current_region == 'asia_pacific' else "")
-    .replace("__AFRICA_ACTIVE__", "active" if current_region == 'africa' else "")
-)
-
-components.html(map_html, height=620)
+components.html(map_html, height=520)
 
 st.markdown("---")
 

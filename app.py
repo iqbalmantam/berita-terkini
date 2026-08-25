@@ -170,7 +170,7 @@ def fetch_live_news():
     store["is_live"] = False
     return fallback
 
-st.markdown("### ⚡ CRUCIX // GLOBAL & REGIONAL OSINT TERMINAL")
+st.markdown("### ⚡ GLOBAL & REGIONAL INTELLIGENCE TERMINAL")
 st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · (UPDATES EVERY 1H)</span>", unsafe_allow_html=True)
 
 news_items = fetch_live_news()

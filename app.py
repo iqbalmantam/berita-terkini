@@ -1,23 +1,26 @@
+"""
+Logistics News & Financial Terminal
+- Left Column: Live News Ticker (Vertical Auto-Scroll, Clean White Titles)
+- Right Column: Currency Exchange Rates (Beli & Jual vs IDR)
+- Bottom: Stable Interactive Map (D3.js Flat & Globe.gl)
+- Developed by iqbalmantam
+"""
+
 import time
 import streamlit as st
 import requests
-from deep_translator import GoogleTranslator
-from streamlit_autorefresh import st_autorefresh
+import feedparser
+from bs4 import BeautifulSoup
+from datetime import datetime
+from urllib.parse import quote_plus
 import json
 import streamlit.components.v1 as components
-
-# Konfigurasi TTL Cache (1 jam untuk data sukses, 15 menit untuk retry jika gagal)
-LIVE_TTL = 3600
-RETRY_TTL = 900
-
-@st.cache_resource
-def _get_cache_store(name: str):
-    return {"data": None, "timestamp": 0.0, "is_live": False, "source": "", "last_error": None}
+from streamlit_autorefresh import st_autorefresh
 
 # Konfigurasi Halaman (Full Width Layout)
 st.set_page_config(
-    page_title="ManTam // Global & Regional Terminal",
-    page_icon="🛡️",
+    page_title="Logistics & Currency Terminal",
+    page_icon="🚛",
     layout="wide"
 )
 
@@ -44,6 +47,7 @@ st.markdown("""
         color: #ffffff !important;
     }
     
+    /* Animasi Auto-Scroll untuk Ticker Berita */
     @keyframes autoScroll {
         0% { transform: translateY(0); }
         100% { transform: translateY(-50%); }
@@ -55,248 +59,196 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Auto-Refresh otomatis setiap 1 Jam
-st_autorefresh(interval=3600 * 1000, key="osint_refresher")
+st_autorefresh(interval=3600 * 1000, key="logistics_refresher")
 
-# Inisialisasi Translator
-@st.cache_resource
-def get_translator():
-    return GoogleTranslator(source='auto', target='id')
+# ─── Kamus Koordinat Geografis Presisi ────────────────────────
+GEOGRAPHIC_MAPPING = {
+    "jakarta": {"lat": -6.2088, "lon": 106.8456},
+    "indonesia": {"lat": -0.7893, "lon": 113.9213},
+    "singapore": {"lat": 1.3521, "lon": 103.8198},
+    "singapura": {"lat": 1.3521, "lon": 103.8198},
+    "china": {"lat": 35.8617, "lon": 104.1954},
+    "tiongkok": {"lat": 35.8617, "lon": 104.1954},
+    "shanghai": {"lat": 31.2304, "lon": 121.4737},
+    "japan": {"lat": 36.2048, "lon": 138.2529},
+    "jepang": {"lat": 36.2048, "lon": 138.2529},
+    "tokyo": {"lat": 35.6762, "lon": 139.6503},
+    "usa": {"lat": 37.0902, "lon": -95.7129},
+    "america": {"lat": 37.0902, "lon": -95.7129},
+    "amerika": {"lat": 37.0902, "lon": -95.7129},
+    "europe": {"lat": 54.5260, "lon": 15.2551},
+    "eropa": {"lat": 54.5260, "lon": 15.2551},
+    "uk": {"lat": 55.3781, "lon": -3.4360},
+    "london": {"lat": 51.5074, "lon": -0.1278},
+    "germany": {"lat": 51.1657, "lon": 10.4515},
+    "jerman": {"lat": 51.1657, "lon": 10.4515},
+    "rotterdam": {"lat": 51.9244, "lon": 4.4777}
+}
 
-translator = get_translator()
+def get_precise_coordinates(text: str):
+    text_lower = text.lower()
+    for keyword, loc in GEOGRAPHIC_MAPPING.items():
+        if keyword in text_lower:
+            return loc["lat"], loc["lon"]
+    return -6.2088, 106.8456
 
-def translate_title(text: str, max_retries: int = 2) -> str:
-    error_keywords = ["Error 500", "502 Bad Gateway", "Server Error", "That's an error"]
-    for attempt in range(max_retries):
+# ─── Data Fetching Functions ──────────────────────────────────
+@st.cache_data(ttl=1800)
+def fetch_news(category="all"):
+    queries = {
+        "id_log": ["industri logistik Indonesia", "jasa pengiriman barang Indonesia"],
+        "supply": ["supply chain logistics"],
+        "warehouse": ["warehouse logistics"],
+        "freight": ["freight forwarding", "shipping cargo"]
+    }
+    
+    active_queries = queries.get(category, ["logistik Indonesia", "supply chain logistics", "shipping cargo", "freight forwarding"])
+
+    all_articles = []
+    seen = set()
+    for q in active_queries:
         try:
-            result = translator.translate(text)
-            if result and not any(err in result for err in error_keywords):
-                return result
+            url = f"https://news.google.com/rss/search?q={quote_plus(q)}&hl=id&gl=ID&ceid=ID:id"
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:8]:
+                title = entry.get("title", "")
+                if " - " in title:
+                    title_clean, source = title.rsplit(" - ", 1)
+                else:
+                    title_clean = title
+                    source = "WEB"
+                
+                link = entry.get("link", "#")
+                published = entry.get("published", datetime.now().strftime("%d %b %Y, %H:%M"))
+                summary = BeautifulSoup(entry.get("summary", ""), "html.parser").get_text(strip=True)[:250]
+                lat, lon = get_precise_coordinates(title_clean + " " + summary)
+                
+                if title_clean.lower() not in seen:
+                    seen.add(title_clean.lower())
+                    all_articles.append({
+                        "title": title_clean,
+                        "source": source.upper(),
+                        "link": link,
+                        "published": published,
+                        "lat": lat,
+                        "lon": lon
+                    })
         except Exception:
             pass
-        time.sleep(0.4 * (attempt + 1))
-    return text
+    return all_articles[:15]
 
-def fetch_forex_rates():
-    store = _get_cache_store("forex_v3")
-    now = time.time()
-    ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
-    if store["data"] is not None and (now - store["timestamp"]) < ttl:
-        return store["data"]
-
-    default_rates = {
-        "USD": 16250.0, "SGD": 12100.5, "EUR": 17620.0, "GBP": 20615.3,
-        "JPY": 104.5, "AUD": 10750.25, "MYR": 3650.0, "CNY": 2280.1
-    }
+@st.cache_data(ttl=3600)
+def fetch_currency_rates():
     try:
         url = "https://open.er-api.com/v6/latest/USD"
         res = requests.get(url, timeout=5)
         if res.status_code == 200:
             data = res.json()
             rates = data.get("rates", {})
-            idr_per_usd = rates.get("IDR", 16250.0)
-
-            live_rates = {}
-            currencies = ["USD", "SGD", "EUR", "GBP", "JPY", "AUD", "MYR", "CNY"]
-            for cur in currencies:
-                if cur == "USD":
-                    val_in_idr = idr_per_usd
-                else:
-                    val_in_usd = rates.get(cur, 1.0)
-                    if val_in_usd:
-                        val_in_idr = idr_per_usd / val_in_usd
-                    else:
-                        val_in_idr = default_rates.get(cur, 1.0)
-                live_rates[cur] = val_in_idr
-
-            store["data"] = live_rates
-            store["timestamp"] = now
-            store["is_live"] = True
-            return live_rates
+            idr_per_usd = rates.get("IDR", 15500.0)
+            
+            targets = {
+                "USD": 1.0, "SGD": rates.get("SGD", 1.35), 
+                "EUR": rates.get("EUR", 0.92), "GBP": rates.get("GBP", 0.79),
+                "JPY": rates.get("JPY", 150.0), "CNY": rates.get("CNY", 7.2)
+            }
+            
+            result = {}
+            for curr, rate_usd in targets.items():
+                mid = idr_per_usd if curr == "USD" else (idr_per_usd / rate_usd)
+                buy = mid * 0.992
+                sell = mid * 1.008
+                result[curr] = {
+                    "buy": f"Rp {buy:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                    "sell": f"Rp {sell:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                }
+            return result
     except Exception:
         pass
-
-    fallback = store["data"] if store["data"] is not None else default_rates
-    store["data"] = fallback
-    store["timestamp"] = now
-    store["is_live"] = False
-    return fallback
-
-forex_rates = fetch_forex_rates()
-
-def fetch_live_news():
-    store = _get_cache_store("news_v3")
-    now = time.time()
-    ttl = LIVE_TTL if store["is_live"] else RETRY_TTL
-    
-    if store["data"] is not None and (now - store["timestamp"]) < ttl:
-        return store["data"]
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        
+    return {
+        "USD": {"buy": "Rp 15.450,00", "sell": "Rp 15.650,00"},
+        "SGD": {"buy": "Rp 11.450,00", "sell": "Rp 11.650,00"},
+        "EUR": {"buy": "Rp 16.750,00", "sell": "Rp 16.950,00"},
+        "GBP": {"buy": "Rp 24.044,37", "sell": "Rp 24.286,03"},
+        "JPY": {"buy": "Rp 102,50", "sell": "Rp 104,50"},
+        "CNY": {"buy": "Rp 2.150,00", "sell": "Rp 2.190,00"}
     }
-    regions_pool = ["world", "americas", "europe", "middle_east", "asia_pacific", "africa"]
 
-    articles_list = []
-    url_gdelt = "https://api.gdeltproject.org/api/v2/doc/doc?query=geopolitics%20OR%20war%20OR%20economy%20OR%20defense&mode=artlist&maxrecords=25&format=json"
-    try:
-        res_gdelt = requests.get(url_gdelt, headers=headers, timeout=10)
-        if res_gdelt.status_code == 200:
-            data = res_gdelt.json()
-            for idx, art in enumerate(data.get("articles", [])):
-                title_en = art.get("title", "")
-                if not title_en: continue
-                try: title_id = translate_title(title_en)
-                except: title_id = title_en
-                time.sleep(0.1)
-                assigned_region = regions_pool[idx % len(regions_pool)]
-                articles_list.append({
-                    "title": title_id, "url": art.get("url", "#"),
-                    "source": art.get("source", "GDELT").upper(), "date": "1h ago",
-                    "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
-                    "region": assigned_region, "type": "news"
-                })
-    except Exception:
-        pass
 
-    if len(articles_list) >= 5:
-        store.update({"data": articles_list, "timestamp": now, "is_live": True, "source": "GDELT", "last_error": None})
-        return articles_list
-
-    # Backup RSS BBC News
-    bbc_list = []
-    url_bbc = "https://api.rss2json.com/v1/api.json?rss_url=http://feeds.bbci.co.uk/news/world/rss.xml"
-    try:
-        res_bbc = requests.get(url_bbc, headers=headers, timeout=10)
-        if res_bbc.status_code == 200:
-            b_data = res_bbc.json()
-            for idx, item in enumerate(b_data.get("items", [])[:15]):
-                title_en = item.get("title", "")
-                if not title_en: continue
-                try: title_id = translate_title(title_en)
-                except: title_id = title_en
-                time.sleep(0.1)
-                assigned_region = regions_pool[idx % len(regions_pool)]
-                bbc_list.append({
-                    "title": title_id, "url": item.get("link", "#"),
-                    "source": "BBC NEWS", "date": "LIVE BACKUP",
-                    "lat": 20.0 + (hash(title_en) % 30) - 15, "lon": 0.0 + (hash(title_en) % 180) - 90,
-                    "region": assigned_region, "type": "news"
-                })
-    except Exception:
-        pass
-
-    if len(bbc_list) >= 5:
-        store.update({"data": bbc_list, "timestamp": now, "is_live": True, "source": "BBC", "last_error": None})
-        return bbc_list
-
-    error_item = [{
-        "title": "KONEKSI TERPUTUS ATAU SELURUH API DIBLOKIR SEMENTARA.", 
-        "url": "#", "source": "SYSTEM ALERT", "date": "NOW",
-        "lat": 0.0, "lon": 0.0, "region": "world", "type": "news"
-    }]
-    
-    fallback_data = store["data"] if store["data"] is not None else error_item
-    store.update({"data": fallback_data, "timestamp": now, "is_live": False, "source": "OFFLINE", "last_error": "API Gagal"})
-    return fallback_data
-
-def fetch_darkweb_leaks():
-    store = _get_cache_store("darkweb_v3")
-    now = time.time()
-    if store["data"] is not None and (now - store["timestamp"]) < 1800:
-        return store["data"]
-    
-    default_fallback = [
-        {"group": "LockBit 3.0", "target": "Global Supply Chain Infrastructure", "country": "US", "date": "Live", "url": "https://www.ransomware.live"},
-        {"group": "BlackCat", "target": "Financial Data Provider", "country": "EU", "date": "Live", "url": "https://www.ransomware.live"}
-    ]
-
-    try:
-        url = "https://api.ransomware.live/v2/recentvictims"
-        res = requests.get(url, timeout=6)
-        if res.status_code == 200:
-            victims = res.json()
-            if isinstance(victims, list) and len(victims) > 0:
-                parsed_data = []
-                for v in victims[:15]:
-                    if isinstance(v, dict):
-                        group_name = v.get("group_name") or v.get("gang") or v.get("ransomware") or v.get("group") or "Unknown Gang"
-                        target_name = v.get("post_title") or v.get("target") or v.get("title") or v.get("name") or v.get("victim") or "Target Confirmed"
-                        country_code = v.get("country") or v.get("geolocation") or "INT"
-                        pub_date = v.get("published") or v.get("date") or v.get("discovered") or "Recent"
-                        post_url = v.get("post_url") or v.get("url") or v.get("website") or "https://www.ransomware.live"
-                        
-                        parsed_data.append({
-                            "group": str(group_name),
-                            "target": str(target_name),
-                            "country": str(country_code).upper()[:3],
-                            "date": str(pub_date)[:10],
-                            "url": str(post_url)
-                        })
-                if parsed_data:
-                    store["data"] = parsed_data
-                    store["timestamp"] = now
-                    store["is_live"] = True
-                    return parsed_data
-    except Exception:
-        pass
-    
-    return store["data"] if store["data"] is not None else default_fallback
-
-st.markdown("### ⚡ ManTam // GLOBAL & REGIONAL TERMINAL")
-st.markdown("<span style='color: #888; font-size: 0.85em;'>INITIALIZING INTEL ENGINE · LIVE FEED · UPDATES EVERY 1H</span>", unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
-
-with st.spinner("MENGINISIALISASI FEED INTELIJEN GLOBAL & MENERJEMAHKAN DATA..."):
-    news_items = fetch_live_news()
-    darkweb_items = fetch_darkweb_leaks()
-
-COUNTRY_COORDS = {
-    "US": (37.0902, -95.7129), "GB": (55.3781, -3.4360), "CA": (56.1304, -106.3468),
-    "FR": (46.2276, 2.2137), "DE": (51.1657, 10.4515), "BR": (-14.2350, -51.9253),
-    "AU": (-25.2744, 133.7751), "IT": (41.8719, 12.5674), "ES": (40.4637, -3.7492),
-    "JP": (36.2048, 138.2529), "CN": (35.8617, 104.1954), "ZA": (-30.5595, 22.9375),
-    "AR": (-38.4161, -63.6167), "AE": (23.4241, 53.8478), "INT": (0.0, 0.0), "EU": (50.8503, 4.3517)
-}
-
-darkweb_map_items = []
-for d in darkweb_items:
-    cc = d.get("country", "INT")
-    lat, lon = COUNTRY_COORDS.get(cc, (20.0 + (hash(d["target"]) % 30) - 15, 0.0 + (hash(d["target"]) % 180) - 90))
-    darkweb_map_items.append({
-        "title": f"[{d['group']}] Target: {d['target']} [DATA LEAKED]",
-        "url": d.get("url", "#"),
-        "source": f"DARKWEB ({cc})",
-        "date": d.get("date", "Recent"),
-        "lat": lat,
-        "lon": lon,
-        "region": "world",
-        "type": "darkweb"
-    })
-
-globe_data_combined = news_items + darkweb_map_items
-
-if "selected_region" not in st.session_state:
-    st.session_state.selected_region = "world"
+# State Management
+if "selected_cat" not in st.session_state:
+    st.session_state.selected_cat = "all"
 if "flat_mode" not in st.session_state:
     st.session_state.flat_mode = False
 
-# --- KONTROL TOMBOL DI ATAS PETA (MENU & MODE/ZOOM) ---
-menu_cols = st.columns(6)
-regions = [
-    ("world", "WORLD"),
-    ("americas", "AMERICAS"),
-    ("europe", "EUROPE"),
-    ("middle_east", "MIDDLE EAST"),
-    ("asia_pacific", "ASIA PACIFIC"),
-    ("africa", "AFRICA")
+with st.spinner("MENGINISIALISASI FEED SISTEM & MENYINKRONKAN DATA..."):
+    news_items = fetch_news(st.session_state.selected_cat)
+    rates_dict = fetch_currency_rates()
+
+
+# ─── Main Header ──────────────────────────────────────────────
+st.markdown("### 🚛 LOGISTICS NEWS & FINANCIAL TERMINAL")
+st.markdown("<span style='color: #888; font-size: 0.85em;'>COMMAND CENTER · LIVE TICKER & MAPPING SYSTEM</span>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+
+
+# ─── TATA LETAK SEIMBANG 2 KOLOM (KIRI & KANAN) ───────────────
+left_col, right_col = st.columns(2)
+
+with left_col:
+    # 1. Live News Ticker (Kiri) - Dibuat SATU BARIS TANPA SPASI agar tidak error kode HTML mentah
+    cards_html = ""
+    for item in news_items:
+        cards_html += f'<div style="background: #0a1412; border: 1px solid #163028; border-radius: 4px; padding: 12px; margin-bottom: 12px;"><div style="font-size: 0.75em; color: #00ffcc; margin-bottom: 4px;">[{item["source"]}] &bull; {item["published"]}</div><div style="font-size: 0.95em; font-weight: bold; margin-top: 4px; line-height: 1.3;"><a href="{item["link"]}" target="_blank" style="color: #ffffff; text-decoration: none;">{item["title"]}</a></div></div>'
+    
+    ticker_widget_html = f'<div style="background: #080808; border: 1px solid #1a3630; border-radius: 6px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a3630; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: \'Courier New\', Courier, monospace; font-size: 14px; font-weight: bold; color: #00ffcc;">🟢 LIVE NEWS TICKER (AUTO-SCROLL)</span><span style="border: 1px solid #1a3630; padding: 2px 8px; border-radius: 4px; font-size: 11px; color: #00ffcc;">{len(news_items)} ITEMS</span></div><div class="ticker-container" style="height: 480px; overflow: hidden; position: relative;"><div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">{cards_html}{cards_html}</div></div></div>'
+    
+    st.markdown(ticker_widget_html, unsafe_allow_html=True)
+
+
+with right_col:
+    # 2. Kurs Valas Asing (Kanan) - Dibuat SATU BARIS TANPA SPASI
+    forex_cards_html = ""
+    currencies_meta = [
+        ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
+        ("EUR", "Euro Zone"), ("GBP", "British Pound"), 
+        ("JPY", "Japanese Yen"), ("CNY", "Chinese Yuan")
+    ]
+    
+    for code, name in currencies_meta:
+        vals = rates_dict.get(code, {"buy": "-", "sell": "-"})
+        forex_cards_html += f'<div style="background: #080808; border: 1px solid #1a3630; border-radius: 6px; padding: 11px 16px; margin-bottom: 10px;"><div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.95em; font-weight: bold; color: #00ffcc; border-bottom: 1px solid #142822; padding-bottom: 4px; margin-bottom: 6px;"><span>{code}</span><span style="font-size: 0.75em; color: #888;">IDR / {code} ({name})</span></div><div style="display: flex; justify-content: space-between; font-size: 0.9em;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <span style="color: #00ffcc; font-weight: bold;">{vals["buy"]}</span></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <span style="color: #ffaa00; font-weight: bold;">{vals["sell"]}</span></div></div></div>'
+
+    forex_widget_html = f'<div style="background: #080808; border: 1px solid #1a3630; border-radius: 6px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a3630; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: \'Courier New\', Courier, monospace; font-size: 14px; font-weight: bold; color: #00ffcc;">💱 KURS VALUTA ASING (BELI & JUAL)</span><span style="border: 1px solid #1a3630; padding: 2px 8px; border-radius: 4px; font-size: 11px; color: #00ffcc;">LIVE 1H</span></div><div style="max-height: 480px; overflow-y: auto;">{forex_cards_html}</div></div>'
+    
+    st.markdown(forex_widget_html, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+
+# ─── PETA INTERAKTIF (Menggunakan Script Stabil dari Referensi Anda) ──
+st.markdown("""
+<div style="background: #080808; border: 1px solid #1a3630; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: #00ffcc;">
+    <span>🗺️ GLOBAL LOGISTICS MAPPING</span>
+</div>
+""", unsafe_allow_html=True)
+
+cat_menu = [
+    ("all", "SEMUA"),
+    ("id_log", "LOGISTIK ID"),
+    ("supply", "SUPPLY CHAIN"),
+    ("warehouse", "WAREHOUSE"),
+    ("freight", "FREIGHT & E-COM")
 ]
 
-for i, (reg_key, reg_name) in enumerate(regions):
+menu_cols = st.columns(5)
+for i, (cat_key, cat_name) in enumerate(cat_menu):
     with menu_cols[i]:
-        is_active = (st.session_state.selected_region == reg_key)
-        btn_label = f"🟢 {reg_name}" if is_active else reg_name
-        if st.button(btn_label, key=f"reg_{reg_key}"):
-            st.session_state.selected_region = reg_key
+        is_active = (st.session_state.selected_cat == cat_key)
+        btn_label = f"🟢 {cat_name}" if is_active else cat_name
+        if st.button(btn_label, key=f"cat_{cat_key}"):
+            st.session_state.selected_cat = cat_key
             st.rerun()
 
 ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col_rest = st.columns([0.5, 0.5, 2.0, 7.0])
@@ -314,17 +266,19 @@ with ctrl_col3:
         st.session_state.flat_mode = not st.session_state.flat_mode
         st.rerun()
 
-current_region = st.session_state.selected_region
-viewpoints = {
-    "world": (0, 0, 2.5),
-    "americas": (20, -90, 1.6),
-    "europe": (50, 10, 1.4),
-    "middle_east": (25, 45, 1.4),
-    "asia_pacific": (10, 115, 1.6),
-    "africa": (0, 20, 1.6)
-}
-pov_lat, pov_lng, pov_alt = viewpoints.get(current_region, (0, 0, 2.5))
-globe_json = json.dumps(globe_data_combined)
+# Konversi Data ke JSON
+globe_data_clean = []
+for n in news_items:
+    globe_data_clean.append({
+        "title": n["title"],
+        "url": n["link"],
+        "published": n["published"],
+        "source": n["source"],
+        "lat": n["lat"],
+        "lon": n["lon"]
+    })
+
+globe_json = json.dumps(globe_data_clean)
 
 zoom_cmd = ""
 if "zoom_action" in st.session_state:
@@ -334,13 +288,14 @@ if "zoom_action" in st.session_state:
     elif action == "out":
         zoom_cmd = "window.zoomOut && window.zoomOut();"
 
-map_html = """
+# Script Peta Sama Persis Seperti Project Referensi Anda (Bebas Bug)
+map_html_template = """
 <!DOCTYPE html>
 <html>
 <head>
     <style>
         body { margin: 0; background-color: #050505; color: #00ffcc; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        #map-container { width: 100%; height: 500px; position: relative; border: 1px solid #1a2b27; background: #050505; }
+        #map-container { width: 100%; height: 500px; position: relative; border: 1px solid #1a3630; background: #050505; }
         .globe-tooltip { background: rgba(10, 10, 10, 0.95); border: 1px solid #00ffcc; color: #fff; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; max-width: 280px; box-shadow: 0 0 20px rgba(0,255,204,0.4); border-radius: 3px; }
         .globe-tooltip a { color: #00ffcc; text-decoration: none; font-weight: bold; }
         .globe-tooltip a:hover { text-decoration: underline; }
@@ -352,22 +307,15 @@ map_html = """
 </head>
 <body>
     <div id="map-container"></div>
-
     <script>
         const data = __GLOBE_DATA_JSON__;
         const isFlat = __IS_FLAT_BOOL__;
-        const povLat = __POV_LAT__, povLng = __POV_LNG__, povAlt = __POV_ALT__;
         const container = document.getElementById('map-container');
         
-        const arcsData = data.filter(d => d.type !== 'darkweb').map((d, i) => {
-            const target = data[(i + 2) % data.length];
-            return { startLat: d.lat, startLng: d.lon, endLat: target.lat, endLng: target.lon, color: ['#00ffcc', '#0044ff'] };
-        });
-        
-        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.source}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">DATE: ${d.date}</span></div>`;
+        const tooltipHtml = d => `<div class="globe-tooltip"><b>[${d.source}]</b><br><a href="${d.url}" target="_blank">${d.title}</a><br><hr style="border-color: #333; margin: 6px 0;"><span style="color: #888;">DATE: ${d.published}</span></div>`;
 
         function buildGlobe() {
-            const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: d.type === 'darkweb' ? 5.0 : 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
+            const ringsData = data.map(d => ({ lat: d.lat, lng: d.lon, maxRadius: 4.0, propagationSpeed: 2.5, repeatPeriod: 1400 }));
             const world = Globe()
                 (container)
                 .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
@@ -376,27 +324,21 @@ map_html = """
                 .pointsData(data)
                 .pointLat(d => d.lat)
                 .pointLng(d => d.lon)
-                .pointColor(d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
-                .pointAltitude(d => d.type === 'darkweb' ? 0.12 : 0.09)
-                .pointRadius(d => d.type === 'darkweb' ? 0.75 : 0.55)
+                .pointColor(() => '#00ffcc')
+                .pointAltitude(() => 0.09)
+                .pointRadius(() => 0.55)
                 .ringsData(ringsData)
-                .ringColor(d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
+                .ringColor(() => '#00ffcc')
                 .ringMaxRadius('maxRadius')
                 .ringPropagationSpeed('propagationSpeed')
                 .ringRepeatPeriod('repeatPeriod')
-                .arcsData(arcsData)
-                .arcColor('color')
-                .arcDashLength(0.4)
-                .arcDashGap(0.2)
-                .arcDashInitialGap(() => Math.random())
-                .arcDashAnimateTime(2000)
                 .pointLabel(tooltipHtml);
             
             const controls = world.controls();
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.7;
             controls.enableZoom = true;
-            world.pointOfView({ lat: povLat, lng: povLng, altitude: povAlt }, 1000);
+            world.pointOfView({ lat: 0, lng: 0, altitude: 2.5 }, 1000);
             
             window.zoomIn = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.max(0.4, pov.altitude - 0.3) }, 500); };
             window.zoomOut = () => { const pov = world.pointOfView(); world.pointOfView({ ...pov, altitude: Math.min(4.0, pov.altitude + 0.3) }, 500); };
@@ -405,7 +347,7 @@ map_html = """
         }
 
         function buildFlatMap() {
-            const width = container.clientWidth || 900;
+            const width = container.clientWidth || window.innerWidth || 900;
             const height = 500;
 
             const svg = d3.select(container).append('svg')
@@ -414,12 +356,8 @@ map_html = """
 
             const zoomLayer = svg.append('g');
 
-            const isWorld = (povLat === 0 && povLng === 0);
-            const scaleFactor = isWorld ? 1.0 : 2.5;
-
             const projection = d3.geoEquirectangular()
-                .rotate([-povLng, -povLat])
-                .scale((width / 6.28) * scaleFactor)
+                .scale(width / 6.28)
                 .translate([width / 2, height / 2]);
 
             const geoPath = d3.geoPath(projection);
@@ -445,44 +383,19 @@ map_html = """
                         .attr('fill', '#0a1a16').attr('stroke', '#00ffcc44').attr('stroke-width', 0.6);
                 })
                 .catch(() => {})
-                .finally(() => drawPointsAndArcs());
+                .finally(() => drawPointsAndTooltips());
 
-            function drawPointsAndArcs() {
-                const arcsG = contentLayer.append('g');
-                
-                arcsData.forEach(a => {
-                    const p1 = projection([a.startLng, a.startLat]);
-                    const p2 = projection([a.endLng, a.endLat]);
-                    if (!p1 || !p2) return;
-                    
-                    const mx = (p1[0] + p2[0]) / 2;
-                    const my = (p1[1] + p2[1]) / 2 - 50; 
-                    
-                    arcsG.append('path')
-                        .attr('d', `M${p1[0]},${p1[1]} Q${mx},${my} ${p2[0]},${p2[1]}`)
-                        .attr('fill', 'none')
-                        .attr('stroke', '#00ffcc')
-                        .attr('stroke-opacity', 0.35)
-                        .attr('stroke-width', 1.2)
-                        .attr('stroke-dasharray', '4,3');
-                });
-
+            function drawPointsAndTooltips() {
                 const tooltip = d3.select(container).append('div')
                     .style('position', 'absolute').style('pointer-events', 'none')
                     .style('opacity', 0).style('z-index', 100).style('transition', 'opacity 0.15s');
 
                 contentLayer.append('g').selectAll('circle').data(data).join('circle')
-                    .attr('cx', d => {
-                        const coords = projection([d.lon, d.lat]);
-                        return coords ? coords[0] : -9999;
-                    })
-                    .attr('cy', d => {
-                        const coords = projection([d.lon, d.lat]);
-                        return coords ? coords[1] : -9999;
-                    })
-                    .attr('r', d => d.type === 'darkweb' ? 6 : 5)
-                    .attr('fill', d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
-                    .attr('stroke', d => d.type === 'darkweb' ? '#ff3333' : '#00ffcc')
+                    .attr('cx', d => { const coords = projection([d.lon, d.lat]); return coords ? coords[0] : -9999; })
+                    .attr('cy', d => { const coords = projection([d.lon, d.lat]); return coords ? coords[1] : -9999; })
+                    .attr('r', 5)
+                    .attr('fill', '#00ffcc')
+                    .attr('stroke', '#00ffcc')
                     .attr('stroke-width', 7).attr('stroke-opacity', 0.2)
                     .style('cursor', 'pointer')
                     .on('mouseenter', function (event, d) {
@@ -511,145 +424,21 @@ map_html = """
 </html>
 """
 
-map_html = (
-    map_html.replace("__GLOBE_DATA_JSON__", globe_json)
-    .replace("__POV_LAT__", str(pov_lat))
-    .replace("__POV_LNG__", str(pov_lng))
-    .replace("__POV_ALT__", str(pov_alt))
+# Injeksi variabel menggunakan Replace (Tanpa Crash)
+final_map_html = (
+    map_html_template
+    .replace("__GLOBE_DATA_JSON__", globe_json)
     .replace("__IS_FLAT_BOOL__", "true" if st.session_state.flat_mode else "false")
     .replace("__ZOOM_CMD__", zoom_cmd)
 )
 
-components.html(map_html, height=520)
+components.html(final_map_html, height=520)
 
-st.markdown("---")
 
-# --- TATA LETAK SEIMBANG 2 KOLOM (KIRI & KANAN) ---
-left_col, right_col = st.columns(2)
-
-with left_col:
-    # 1. Live News Ticker (Kiri Atas)
-    cards_html = ""
-    for item in news_items:
-        cards_html += f'<div style="background: #080808; border: 1px solid #161616; border-bottom: 1px solid #1f1f1f; padding: 12px 15px; margin-bottom: 8px;"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><span style="background: #0c1412; border: 1px solid #00ffcc55; color: #00ffcc; font-size: 9px; padding: 2px 7px; font-family: \'Courier New\', Courier, monospace;">{item["source"]}</span><span style="font-size: 10px; color: #777; font-family: \'Courier New\', Courier, monospace;">{item["date"]}</span></div><a href="{item["url"]}" target="_blank" style="color: #ddd; text-decoration: none; font-size: 12px; font-family: \'Courier New\', Courier, monospace; display: block; line-height: 1.4;">{item["title"]}</a><div style="font-size: 11px; color: #00ffcc55; margin-top: 6px;">&nearr;</div></div>'
-
-    ticker_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">LIVE NEWS TICKER (AUTO-SCROLL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">{len(news_items)} ITEMS</span></div><div class="ticker-container" style="height: 480px; overflow: hidden; position: relative;"><div class="ticker-track" style="position: absolute; width: 100%; animation: autoScroll 35s linear infinite;">{cards_html}{cards_html}</div></div></div>"""
-    st.markdown(ticker_widget_html, unsafe_allow_html=True)
-
-    # 2. Darkweb Capability & Trends Intel (Kiri Bawah)
-    st.markdown("""
-    <div style="background: #060606; border: 1px solid #331111; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
-        <div style="border-bottom: 1px solid #331111; padding-bottom: 10px; margin-bottom: 10px;">
-            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff5555;">🧬 DARKWEB CAPABILITY & TRENDS INTEL</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    trends_container = st.container(height=300)
-    with trends_container:
-        trends_list = [
-            {
-                "topic": "AI-ENABLED ADVERSARIES",
-                "desc": "Lonjakan tajam penggunaan AI generatif oleh sindikat kriminal untuk otomatisasi serangan siber, rekayasa sosial, dan voice phishing interaktif.",
-                "level": "CRITICAL",
-                "url": "https://thehackernews.com/2026/08/uat-10147-uses-ai-to-scale-server.html"
-            },
-            {
-                "topic": "INFOSTEALER SURGE (REDLINE & LUMMA)",
-                "desc": "Pasar gelap darkweb dibanjiri miliaran kredensial curian, token OAuth, dan session cookies langsung dari perangkat pengguna tanpa merusak sistem.",
-                "level": "HIGH",
-                "url": "https://cybelangel.com/blog/infostealers-the-malware-that-breaks-in-without-breaking-anything/"
-            },
-            {
-                "topic": "EVOLUSI RaaS & MULTI-EXTORTION",
-                "desc": "Sindikat Ransomware-as-a-Service (seperti RansomHub & Qilin) mengkombinasikan enkripsi data dengan ancaman pembocoran langsung di leak sites.",
-                "level": "HIGH",
-                "url": "https://www.ransomware.live/"
-            },
-            {
-                "topic": "ZERO-DAY & EDGE EXPLOITATION",
-                "desc": "Jeda waktu eksploitasi celah keamanan menyusut ekstrem; hacker semakin mahir menargetkan perangkat VPN dan edge router sebelum patch resmi dirilis.",
-                "level": "CRITICAL",
-                "url": "https://www.cisa.gov/news-events/cybersecurity-advisories"
-            }
-        ]
-        
-        for t in trends_list:
-            trend_html = f"""
-            <div style="background: #080808; border: 1px solid #2a1616; border-left: 3px solid #ff5555; padding: 10px 12px; margin-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ff6666; border-bottom: 1px solid #1f1a1a; padding-bottom: 4px; margin-bottom: 6px;">
-                    <a href="{t["url"]}" target="_blank" style="color: #ff6666; text-decoration: none;"><b>[TREND] {t["topic"]} &nearr;</b></a>
-                    <span style="color: #ff3333; font-weight: bold;">{t["level"]}</span>
-                </div>
-                <div style="font-size: 11px; color: #ccc; line-height: 1.4;">{t["desc"]}</div>
-            </div>
-            """
-            st.markdown(trend_html, unsafe_allow_html=True)
-
-with right_col:
-    # 1. Modul 2: Threat Analytics
-    total_leaks = len(darkweb_items)
-    unique_gangs = len(set(d.get("group", "Unknown") for d in darkweb_items))
-    
-    active_links_html = ""
-    for dw in darkweb_items[:3]:
-        g_name = dw.get('group', 'Gang')
-        t_name = dw.get('target', 'Target')[:22]
-        t_url = dw.get('url', '#')
-        active_links_html += f'<div style="font-size:10px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#ff6666;">• [{g_name}]</span><a href="{t_url}" target="_blank" style="color:#00ffcc;text-decoration:none;">{t_name}... &nearr;</a></div>'
-
-    analytics_html = f"""<div style="background:#080808;border:1px solid #331111;border-radius:4px;padding:12px 15px;margin-bottom:15px;"><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:bold;color:#ff5555;border-bottom:1px solid #221111;padding-bottom:6px;margin-bottom:8px;"><span>📊 MODUL 2: THREAT ANALYTICS</span><a href="https://www.ransomware.live" target="_blank" style="color:#00ffcc;text-decoration:none;font-size:10px;">FEED SOURCE &nearr;</a></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:4px;"><span>Total Active Leaks (24h):</span><b style="color:#00ffcc;">{total_leaks} Targets</b></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:4px;"><span>Active Threat Syndicates:</span><b style="color:#ff5555;">{unique_gangs} Groups</b></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:8px;"><span>Threat Level Status:</span><b style="color:#ffaa00;">HIGH / CRITICAL</b></div><div style="border-top:1px dashed #221111;padding-top:6px;margin-top:6px;"><span style="font-size:10px;color:#888;font-weight:bold;">LATEST HIGHLIGHT LINKS:</span>{active_links_html}</div></div>"""
-    
-    st.markdown(analytics_html, unsafe_allow_html=True)
-
-    # 2. Kurs Valas Asing (Tinggi kontainer ditingkatkan menjadi max-height: 320px agar EUR dan mata uang lainnya tidak terpotong)
-    forex_cards_html = ""
-    currencies_meta = [
-        ("USD", "US Dollar"), ("SGD", "Singapore Dollar"), 
-        ("EUR", "Euro Zone"), ("GBP", "British Pound"), 
-        ("JPY", "Japanese Yen"), ("AUD", "Australian Dollar"), 
-        ("MYR", "Malaysian Ringgit"), ("CNY", "Chinese Yuan")
-    ]
-    
-    for code, name in currencies_meta:
-        mid_rate = forex_rates.get(code, 10000.0)
-        buy_rate = mid_rate * 0.995
-        sell_rate = mid_rate * 1.005
-        
-        forex_cards_html += f'<div style="background: #080808; border: 1px solid #161616; padding: 10px 12px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 6px;"><span><b>{code} / IDR</b> ({name})</span><span style="color: #00ffcc;">LIVE 1H</span></div><div style="display: flex; justify-content: space-between; font-size: 12px; font-family: \'Courier New\', Courier, monospace;"><div><span style="color: #666; font-size: 10px;">BELI:</span> <b style="color: #00ffcc;">Rp {buy_rate:,.2f}</b></div><div><span style="color: #666; font-size: 10px;">JUAL:</span> <b style="color: #ffaa00;">Rp {sell_rate:,.2f}</b></div></div></div>'
-
-    forex_widget_html = f"""<div style="background: #060606; border: 1px solid #1f1f1f; border-radius: 4px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 10px;"><span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #00ffcc;">KURS VALUTA ASING (BELI & JUAL)</span><span style="background: #0d1a17; border: 1px solid #00ffcc55; color: #00ffcc; padding: 2px 10px; font-size: 11px; font-family: 'Courier New\', Courier, monospace;">AUTO-UPDATE 1H</span></div><div style="max-height: 320px; overflow-y: auto; padding-right: 4px;">{forex_cards_html}</div></div>"""
-    st.markdown(forex_widget_html, unsafe_allow_html=True)
-
-    # 3. Live Darkweb & Ransomware Leaks (Kanan Bawah)
-    st.markdown("""
-    <div style="background: #060606; border: 1px solid #2a1616; border-radius: 4px; padding: 15px; margin-bottom: 10px;">
-        <div style="border-bottom: 1px solid #2a1616; padding-bottom: 10px; margin-bottom: 10px;">
-            <span style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; color: #ff3333;">⚠️ LIVE DARKWEB & RANSOM LEAKS</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    dw_container = st.container(height=300)
-    with dw_container:
-        for dw in darkweb_items:
-            card_html = f"""
-            <div style="background: #080808; border: 1px solid #2a1616; border-left: 3px solid #ff3333; padding: 10px 12px; margin-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ff6666; border-bottom: 1px solid #1f1a1a; padding-bottom: 4px; margin-bottom: 6px;">
-                    <span><b>GANG: {dw.get("group", "Unknown")}</b></span>
-                    <span>[{dw.get("country", "INT")}] {dw.get("date", "Recent")}</span>
-                </div>
-                <div style="font-size: 12px; margin-bottom: 4px;">
-                    Target: <a href="{dw.get("url", "#")}" target="_blank" style="color: #00ffcc; text-decoration: none; font-weight: bold;"><b>{dw.get("target", "Target Confirmed")} &nearr;</b></a>
-                </div>
-                <div style="font-size: 10px; color: #ff3333; font-weight: bold;">STATUS: [DATA LEAKED / EXTORTION]</div>
-            </div>
-            """
-            st.markdown(card_html, unsafe_allow_html=True)
-
+# ─── Footer ───────────────────────────────────────────────────
 st.markdown("---")
 footer_col1, footer_col2 = st.columns([2, 1])
 with footer_col1:
-    st.markdown("<span style='color: gray; font-size: 0.82em;'>⚙️ Sistem OSINT otomatis memperbarui berita, kurs, & intel darkweb tiap 1 jam.</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color: gray; font-size: 0.82em;'>⚙️ Sistem otomatis memperbarui berita logistik & kurs setiap 1 jam.</span>", unsafe_allow_html=True)
 with footer_col2:
     st.markdown("<div style='text-align: right; color: gray; font-size: 0.85em;'><b>Developed by iqbalmantam</b></div>", unsafe_allow_html=True)
